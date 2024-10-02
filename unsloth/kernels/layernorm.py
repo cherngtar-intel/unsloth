@@ -171,17 +171,23 @@ def test_layernorm(
     bsz = 21, random_state = 3407, seqlen = 3341,
 ):
     from torch.nn import LayerNorm
-    layernorm = LayerNorm((dim,), eps = eps, device = "cuda", dtype = dtype)
+# KCT : CUDA
+#    layernorm = LayerNorm((dim,), eps = eps, device = "cuda", dtype = dtype)
+    layernorm = LayerNorm((dim,), eps = eps, device = "xpu", dtype = dtype)
     torch.cuda.manual_seed(random_state)
     torch.manual_seed(random_state)
     torch.nn.init.uniform_(layernorm.weight)
     torch.nn.init.uniform_(layernorm.bias)
-    X = torch.randn((bsz, seqlen, dim), dtype = dtype, device = "cuda")
+# KCT : CUDA
+#    X = torch.randn((bsz, seqlen, dim), dtype = dtype, device = "cuda")
+    X = torch.randn((bsz, seqlen, dim), dtype = dtype, device = "xpu")
     XX = X.clone()
     X .requires_grad_(True)
     XX.requires_grad_(True)
     Y = layernorm(X)
-    YY = torch.randn((bsz, seqlen, dim), dtype = dtype, device = "cuda", requires_grad = True)
+# KCT : CUDA
+#    YY = torch.randn((bsz, seqlen, dim), dtype = dtype, device = "cuda", requires_grad = True)
+    YY = torch.randn((bsz, seqlen, dim), dtype = dtype, device = "xpu", requires_grad = True)
     Y.backward(YY)
     correct_grad = X.grad.clone()
     # from unsloth.kernels import fast_layernorm
@@ -194,7 +200,9 @@ pass
 def testing_suite_layernorm():
     for dim in [512, 1024, 2048]:
         for dtype in [torch.float16, torch.bfloat16]:
-            with torch.autocast(device_type = "cuda", dtype = dtype):
+# KCT : CUDA
+#            with torch.autocast(device_type = "cuda", dtype = dtype):
+            with torch.autocast(device_type = "xpu", dtype = dtype):
                 for seqlen in [3341, 2048, 349]:
                     for random_state in [3407, 42]:
                         test_layernorm(

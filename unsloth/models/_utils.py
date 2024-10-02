@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-__version__ = "2024.9.post4"
+__version__ = "2024.9.post3"
 
 __all__ = [
     "prepare_model_for_kbit_training",
@@ -93,7 +93,9 @@ pass
 
 from transformers import __version__ as transformers_version
 from transformers import PretrainedConfig
-model_architectures = ["llama", "mistral", "gemma", "gemma2", "qwen2",]
+# KCT : Temp gemma error
+model_architectures = ["llama", "mistral", "qwen2",]
+# model_architectures = ["llama", "mistral", "gemma", "gemma2", "qwen2",]
 
 for model_name in model_architectures:
     config_filepath = f"transformers.models.{model_name}.configuration_{model_name}"
@@ -134,8 +136,11 @@ if Version(torch_version) < Version("2.4.0"):
     torch_amp_custom_fwd = torch.cuda.amp.custom_fwd
     torch_amp_custom_bwd = torch.cuda.amp.custom_bwd
 else:
-    torch_amp_custom_fwd = torch.amp.custom_fwd(device_type = "cuda")
-    torch_amp_custom_bwd = torch.amp.custom_bwd(device_type = "cuda")
+# KCT : CUDA
+#    torch_amp_custom_fwd = torch.amp.custom_fwd(device_type = "cuda")
+#    torch_amp_custom_bwd = torch.amp.custom_bwd(device_type = "cuda")
+    torch_amp_custom_fwd = torch.amp.custom_fwd(device_type = "xpu")
+    torch_amp_custom_bwd = torch.amp.custom_bwd(device_type = "xpu")
 pass
 # =============================================
 
@@ -163,11 +168,14 @@ pass
 
 # =============================================
 # Get Flash Attention v2 if Ampere (RTX 30xx, A100)
-import bitsandbytes as bnb
+# KCT : Temp bitbandbytes
+# import bitsandbytes as bnb
 from transformers import AutoTokenizer
 from transformers.utils.import_utils import _is_package_available
 
-major_version, minor_version = torch.cuda.get_device_capability()
+# KCT CUDA
+major_version, minor_version = 0, 0
+# major_version, minor_version = torch.cuda.get_device_capability()
 SUPPORTS_BFLOAT16 = False
 HAS_FLASH_ATTENTION = False
 HAS_FLASH_ATTENTION_SOFTCAPPING = False
@@ -1091,15 +1099,17 @@ pass
 def check_nvidia():
     # Unsloth doesn't work yet on AMD devices - we're working on it!
     output = np.array([0,])
-    try:
-        output = subprocess.check_output("nvidia-smi --query-gpu=memory.used --format=csv", shell = True)
-        output = re.findall(rb'([\d]{1,})[\s]{1,}M', output)
-        output = np.array([int(x.decode('utf-8'))/1024 for x in output])
-    except:
-        if not torch.cuda.is_available():
-            raise RuntimeError("Unsloth: We do not support AMD / Intel machines yet - it is a work in progress!")    
+# KCT CUDA
+    # try:
+    #     output = subprocess.check_output("nvidia-smi --query-gpu=memory.used --format=csv", shell = True)
+    #     output = re.findall(rb'([\d]{1,})[\s]{1,}M', output)
+    #     output = np.array([int(x.decode('utf-8'))/1024 for x in output])
+    # except:
+    #     if not torch.cuda.is_available():
+    #         raise RuntimeError("Unsloth: We do not support AMD / Intel machines yet - it is a work in progress!")    
     return output
 pass
+
 PRE_CHECK = check_nvidia()
 
 

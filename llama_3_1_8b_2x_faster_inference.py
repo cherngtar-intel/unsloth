@@ -37,7 +37,6 @@ model, tokenizer = FastLanguageModel.from_pretrained(
     model_name = "unsloth/Meta-Llama-3.1-8B-Instruct",
     max_seq_length = 8192,
     load_in_4bit = True,
-    token = "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", # use one if using gated models like meta-llama/Llama-2-7b-hf
     # token = "hf_...", # use one if using gated models like meta-llama/Llama-2-7b-hf
 )
 

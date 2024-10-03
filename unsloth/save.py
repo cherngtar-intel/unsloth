@@ -12,9 +12,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from bitsandbytes.nn import Linear4bit as Bnb_Linear4bit
-from peft.tuners.lora import Linear4bit as Peft_Linear4bit
-from peft.tuners.lora import Linear as Peft_Linear
+# KCT : bitsandbytes
+# from bitsandbytes.nn import Linear4bit as Bnb_Linear4bit
+# from peft.tuners.lora import Linear4bit as Peft_Linear4bit
+# from peft.tuners.lora import Linear as Peft_Linear
 from typing import Optional, Callable, Union, List
 import torch
 import os
@@ -149,8 +150,11 @@ pass
 
 def _merge_lora(layer, name):
 
-    bias = getattr(layer, "bias", None)
-    if isinstance(layer, (Bnb_Linear4bit, Peft_Linear4bit, Peft_Linear)):
+    bias = None
+# KCT : bitsandbytes
+    W = layer.weight
+    return W, bias
+"""     if isinstance(layer, (Bnb_Linear4bit, Peft_Linear4bit, Peft_Linear)):
         # Is LoRA so we need to merge!
         W, quant_state, A, B, s, bias = get_lora_parameters_bias(layer)
         if quant_state is not None:
@@ -174,7 +178,7 @@ def _merge_lora(layer, name):
         W = W.t().to(dtype)
     else:
         W = layer.weight
-    return W, bias
+    return W, bias """
 pass
 
 

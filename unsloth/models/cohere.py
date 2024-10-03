@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from .llama import *
+""" from .llama import *
 from ._utils import __version__
 try:
     from transformers.models.cohere.modeling_cohere import (
@@ -470,4 +470,4 @@ class FastCohereModel(FastLlamaModel):
         transformers.models.cohere.modeling_cohere.CohereRotaryEmbedding = LlamaRotaryEmbedding
         return
     pass
-pass
+pass """

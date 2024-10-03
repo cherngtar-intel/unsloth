@@ -16,9 +16,9 @@ __version__ = "2024.12.4"
 
 __all__ = [
     "prepare_model_for_kbit_training",
-    "xformers",
-    "xformers_attention",
-    "xformers_version",
+#    "xformers",
+#    "xformers_attention",
+#    "xformers_version",
     "__version__",
     "HAS_FLASH_ATTENTION",
     "HAS_FLASH_ATTENTION_SOFTCAPPING",
@@ -188,8 +188,8 @@ pass
 
 from transformers import __version__ as transformers_version
 from transformers import PretrainedConfig
-# KCT : Temp gemma error
-model_architectures = ["llama", "mistral", "qwen2",]
+# KCT : Temp focus llama
+model_architectures = ["llama"]
 # model_architectures = ["llama", "mistral", "gemma", "gemma2", "qwen2",]
 
 for model_name in model_architectures:
@@ -276,7 +276,7 @@ pass
 
 # =============================================
 # Get Flash Attention v2 if Ampere (RTX 30xx, A100)
-# KCT : Temp bitbandbytes
+# KCT :  no use bitbandbytes
 # import bitsandbytes as bnb
 from transformers import AutoTokenizer
 from transformers.utils.import_utils import _is_package_available
@@ -334,23 +334,23 @@ from transformers.models.llama.modeling_llama import logger
 
 # =============================================
 # Get Xformers
-try:
-    from xformers import __version__ as xformers_version
-    # Temporarily disable 0.0.27 and higher - inference issues
-    if False: #Version(xformers_version) >= Version("0.0.27"):
-        raise ImportError(
-            "Unsloth: If you are in Colab, we updated the top cell install instructions - please change it to below "\
-            "then press Disconnect Runtime and then Restart it.\n"\
-            "\n"\
-            "%%capture\n"
-            "# Installs Unsloth, Xformers (Flash Attention) and all other packages!\n"
-            '!pip install "unsloth[colab-new] @ git+https://github.com/unslothai/unsloth.git"\n'
-            '!pip install --no-deps "xformers<=0.0.27" trl peft accelerate bitsandbytes\n'\
-            '\n'\
-            f"Otherwise in local machines, your xformers version of {xformers_version} is too new.\n"\
-            'Please downgrade xformers via `pip install --force-reinstall "xformers<=0.0.27"'
-        )
-    pass
+# KCT : xformers
+""" from xformers import __version__ as xformers_version
+# Temporarily disable 0.0.27 and higher - inference issues
+if False: #Version(xformers_version) >= Version("0.0.27"):
+    raise ImportError(
+        "Unsloth: If you are in Colab, we updated the top cell install instructions - please change it to below "\
+        "then press Disconnect Runtime and then Restart it.\n"\
+        "\n"\
+        "%%capture\n"
+        "# Installs Unsloth, Xformers (Flash Attention) and all other packages!\n"
+        '!pip install "unsloth[colab-new] @ git+https://github.com/unslothai/unsloth.git"\n'
+        '!pip install --no-deps "xformers<=0.0.27" trl peft accelerate bitsandbytes\n'\
+        '\n'\
+        f"Otherwise in local machines, your xformers version of {xformers_version} is too new.\n"\
+        'Please downgrade xformers via `pip install --force-reinstall "xformers<=0.0.27"'
+    )
+pass
 
     if   Version(torch_version) < Version("2.2.0") and Version(xformers_version) >= Version("0.0.24"):
         raise ImportError(
@@ -369,25 +369,20 @@ try:
         )
     pass
 
-    from xformers._cpp_lib import _register_extensions
-    try:
-        _register_extensions() # Check if C++ modules are loaded correctly
-    except Exception as error:
-        raise ImportError(
-            "Unsloth: Xformers was not installed correctly.\n"\
-            "Please install xformers separately first.\n"\
-            "Then confirm if it's correctly installed by running:\n"\
-            "python -m xformers.info\n\n"
-            "Longer error message:\n" + str(error)
-        )
-    pass
-    import xformers.ops.fmha as xformers
-    xformers_attention = xformers.memory_efficient_attention
-except:
-    xformers = None
-    xformers_attention = None
-    xformers_version = None
+from xformers._cpp_lib import _register_extensions
+try:
+    _register_extensions() # Check if C++ modules are loaded correctly
+except Exception as error:
+    raise ImportError(
+        "Unsloth: Xformers was not installed correctly.\n"\
+        "Please install xformers separately first.\n"\
+        "Then confirm if it's correctly installed by running:\n"\
+        "python -m xformers.info\n\n"
+        "Longer error message:\n" + str(error)
+    )
 pass
+import xformers.ops.fmha as xformers
+xformers_attention = xformers.memory_efficient_attention """
 
 # Check TRL version
 from trl import __version__ as trl_version
@@ -411,7 +406,8 @@ pass
 # Fix new Xformers versions TypeError: Multiple dispatch failed for 'torch._ops.aten.to.dtype_layout'
 accelerate_old_send_to_device = None
 accelerate_new_send_to_device = None
-if Version(xformers_version) >= Version("0.0.27"):
+# KCT : xformers
+""" if Version(xformers_version) >= Version("0.0.27"):
     import accelerate.utils.operations
     if hasattr(accelerate.utils.operations, "send_to_device") and \
         accelerate.utils.operations.send_to_device.__name__ != "_fixed_send_to_device":
@@ -427,7 +423,7 @@ if Version(xformers_version) >= Version("0.0.27"):
         # accelerate.utils.operations.send_to_device = _fixed_send_to_device
         accelerate_new_send_to_device = _fixed_send_to_device
     pass
-pass
+pass """
 
 # Transformers 4.46 breaks dynamic caching. This is a hack
 import transformers.generation.configuration_utils

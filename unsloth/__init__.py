@@ -110,7 +110,8 @@ def is_bf16_supported(including_emulation = False):
 # KCT : bitsandbytes
 # import bitsandbytes as bnb
 
-if "SPACE_AUTHOR_NAME" not in os.environ and "SPACE_REPO_NAME" not in os.environ:
+# KCT : CUDA
+""" if "SPACE_AUTHOR_NAME" not in os.environ and "SPACE_REPO_NAME" not in os.environ:
 
     import triton
     libcuda_dirs = lambda: None
@@ -169,7 +170,7 @@ if "SPACE_AUTHOR_NAME" not in os.environ and "SPACE_REPO_NAME" not in os.environ
                 "Unsloth will still run for now, but maybe it might crash - let's hope it works!"
             )
     pass
-pass
+pass """
 
 # Check for unsloth_zoo
 try:

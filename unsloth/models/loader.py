@@ -15,9 +15,9 @@
 from ._utils import is_bfloat16_supported, HAS_FLASH_ATTENTION, HAS_FLASH_ATTENTION_SOFTCAPPING
 from .granite import FastGraniteModel
 from .llama   import FastLlamaModel, logger
-from .mistral import FastMistralModel
-from .qwen2   import FastQwen2Model
-from .cohere  import FastCohereModel
+# from .mistral import FastMistralModel
+# from .qwen2   import FastQwen2Model
+# from .cohere  import FastCohereModel
 from transformers import AutoConfig
 from transformers import __version__ as transformers_version
 from peft import PeftConfig, PeftModel
@@ -39,12 +39,13 @@ SUPPORTS_GEMMA   = transformers_version >= Version("4.38")
 SUPPORTS_GEMMA2  = transformers_version >= Version("4.42")
 SUPPORTS_LLAMA31 = transformers_version >= Version("4.43.2")
 SUPPORTS_LLAMA32 = transformers_version  > Version("4.45.0")
-SUPPORTS_GRANITE = transformers_version >= Version("4.46.0")
-if SUPPORTS_GEMMA:
-    from .gemma  import FastGemmaModel
-if SUPPORTS_GEMMA2:
-    from .gemma2 import FastGemma2Model
-pass
+# KCT : gemma
+# SUPPORTS_GRANITE = transformers_version >= Version("4.46.0")
+# if SUPPORTS_GEMMA:
+#     from .gemma  import FastGemmaModel
+# if SUPPORTS_GEMMA2:
+#     from .gemma2 import FastGemma2Model
+# pass
 import torch
 
 def _get_dtype(dtype):

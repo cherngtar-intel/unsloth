@@ -36,7 +36,7 @@ fourbit_models = [
 model, tokenizer = FastLanguageModel.from_pretrained(
     model_name = "unsloth/Meta-Llama-3.1-8B-Instruct",
     max_seq_length = 8192,
-    load_in_4bit = True,
+    load_in_4bit = False,
     # token = "hf_...", # use one if using gated models like meta-llama/Llama-2-7b-hf
 )
 
@@ -53,31 +53,31 @@ FastLanguageModel.for_inference(model) # Enable native 2x faster inference
 
 Unsloth makes inference natively 2x faster!! No need to change or do anything!
 """
-
+model = model.to("xpu")
 messages = [
                                # EDIT HERE!
     {"from": "human", "value": "Continue the fibonnaci sequence: 1, 1, 2, 3, 5, 8,"},
 ]
-inputs = tokenizer.apply_chat_template(messages, tokenize = True, add_generation_prompt = True, return_tensors = "pt").to("cuda")
+inputs = tokenizer.apply_chat_template(messages, tokenize = True, add_generation_prompt = True, return_tensors = "pt").to("xpu")
 
 text_streamer = TextStreamer(tokenizer)
 _ = model.generate(input_ids = inputs, streamer = text_streamer, max_new_tokens = 1024, use_cache = True)
 
-messages = [
-    {"from": "human", "value": "Describe the tallest tower in the world."},
-]
-inputs = tokenizer.apply_chat_template(messages, tokenize = True, add_generation_prompt = True, return_tensors = "pt").to("cuda")
+# messages = [
+#     {"from": "human", "value": "Describe the tallest tower in the world."},
+# ]
+# inputs = tokenizer.apply_chat_template(messages, tokenize = True, add_generation_prompt = True, return_tensors = "pt").to("xpu")
 
-text_streamer = TextStreamer(tokenizer)
-_ = model.generate(input_ids = inputs, streamer = text_streamer, max_new_tokens = 1024, use_cache = True)
+# text_streamer = TextStreamer(tokenizer)
+# _ = model.generate(input_ids = inputs, streamer = text_streamer, max_new_tokens = 1024, use_cache = True)
 
-messages = [
-    {"from": "human", "value": "What is Unsloth?"},
-]
-inputs = tokenizer.apply_chat_template(messages, tokenize = True, add_generation_prompt = True, return_tensors = "pt").to("cuda")
+# messages = [
+#     {"from": "human", "value": "What is Unsloth?"},
+# ]
+# inputs = tokenizer.apply_chat_template(messages, tokenize = True, add_generation_prompt = True, return_tensors = "pt").to("xpu")
 
-text_streamer = TextStreamer(tokenizer)
-_ = model.generate(input_ids = inputs, streamer = text_streamer, max_new_tokens = 1024, use_cache = True)
+# text_streamer = TextStreamer(tokenizer)
+# _ = model.generate(input_ids = inputs, streamer = text_streamer, max_new_tokens = 1024, use_cache = True)
 
 """And we're done! If you have any questions on Unsloth, we have a [Discord](https://discord.gg/u54VK8m8tk) channel! If you find any bugs or want to keep updated with the latest LLM stuff, or need help, join projects etc, feel free to join our Discord!
 

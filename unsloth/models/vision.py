@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+# KCT : Temp focus llama
 # from .llama import *
 # from ..kernels import patch_layernorm, unpatch_layernorm
 # from ..kernels import patch_rms_layernorm, unpatch_rms_layernorm

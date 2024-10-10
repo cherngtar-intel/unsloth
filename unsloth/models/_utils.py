@@ -16,6 +16,7 @@ __version__ = "2024.9.post3"
 
 __all__ = [
     "prepare_model_for_kbit_training",
+# KCT : xformers
 #    "xformers",
 #    "xformers_attention",
 #    "xformers_version",
@@ -43,6 +44,10 @@ __all__ = [
     "accelerate_new_send_to_device",
     "patch_gradient_checkpointing",
     "unpatch_gradient_checkpointing",
+ # KCT
+    "HAS_XPU",
+    "HAS_BNB",
+    "HAS_XFORMERS"
 ]
 
 import torch
@@ -70,6 +75,11 @@ warnings.filterwarnings(action = "ignore", category = RuntimeWarning, module = "
 import logging
 logging.getLogger("transformers.tokenization_utils_base").setLevel(logging.CRITICAL+1)
 # =============================================
+
+# KCT
+HAS_XPU = True
+HAS_BNB = False
+HAS_XFORMERS = False
 
 # =============================================
 # Edits all Config files to enable RoPE Scaling for all models
@@ -136,11 +146,12 @@ if Version(torch_version) < Version("2.4.0"):
     torch_amp_custom_fwd = torch.cuda.amp.custom_fwd
     torch_amp_custom_bwd = torch.cuda.amp.custom_bwd
 else:
-# KCT : CUDA
-#    torch_amp_custom_fwd = torch.amp.custom_fwd(device_type = "cuda")
-#    torch_amp_custom_bwd = torch.amp.custom_bwd(device_type = "cuda")
-    torch_amp_custom_fwd = torch.amp.custom_fwd(device_type = "xpu")
-    torch_amp_custom_bwd = torch.amp.custom_bwd(device_type = "xpu")
+    if HAS_XPU:
+        torch_amp_custom_fwd = torch.amp.custom_fwd(device_type = "xpu")
+        torch_amp_custom_bwd = torch.amp.custom_bwd(device_type = "xpu")
+    else:
+        torch_amp_custom_fwd = torch.amp.custom_fwd(device_type = "cuda")
+        torch_amp_custom_bwd = torch.amp.custom_bwd(device_type = "cuda")
 pass
 # =============================================
 
@@ -168,14 +179,15 @@ pass
 
 # =============================================
 # Get Flash Attention v2 if Ampere (RTX 30xx, A100)
-# KCT :  no use bitbandbytes
-# import bitsandbytes as bnb
+if HAS_BNB:
+    import bitsandbytes as bnb
 from transformers import AutoTokenizer
 from transformers.utils.import_utils import _is_package_available
 
-# KCT CUDA
-major_version, minor_version = 0, 0
-# major_version, minor_version = torch.cuda.get_device_capability()
+if HAS_XPU:
+    major_version, minor_version = 0, 0
+else:
+    major_version, minor_version = torch.cuda.get_device_capability()
 SUPPORTS_BFLOAT16 = False
 HAS_FLASH_ATTENTION = False
 HAS_FLASH_ATTENTION_SOFTCAPPING = False
@@ -226,55 +238,55 @@ from transformers.models.llama.modeling_llama import logger
 
 # =============================================
 # Get Xformers
-# KCT : xformers
-""" from xformers import __version__ as xformers_version
-# Temporarily disable 0.0.27 and higher - inference issues
-if False: #Version(xformers_version) >= Version("0.0.27"):
-    raise ImportError(
-        "Unsloth: If you are in Colab, we updated the top cell install instructions - please change it to below "\
-        "then press Disconnect Runtime and then Restart it.\n"\
-        "\n"\
-        "%%capture\n"
-        "# Installs Unsloth, Xformers (Flash Attention) and all other packages!\n"
-        '!pip install "unsloth[colab-new] @ git+https://github.com/unslothai/unsloth.git"\n'
-        '!pip install --no-deps "xformers<=0.0.27" trl peft accelerate bitsandbytes\n'\
-        '\n'\
-        f"Otherwise in local machines, your xformers version of {xformers_version} is too new.\n"\
-        'Please downgrade xformers via `pip install --force-reinstall "xformers<=0.0.27"'
-    )
-pass
+if HAS_XFORMERS:
+    from xformers import __version__ as xformers_version
+    # Temporarily disable 0.0.27 and higher - inference issues
+    if False: #Version(xformers_version) >= Version("0.0.27"):
+        raise ImportError(
+            "Unsloth: If you are in Colab, we updated the top cell install instructions - please change it to below "\
+            "then press Disconnect Runtime and then Restart it.\n"\
+            "\n"\
+            "%%capture\n"
+            "# Installs Unsloth, Xformers (Flash Attention) and all other packages!\n"
+            '!pip install "unsloth[colab-new] @ git+https://github.com/unslothai/unsloth.git"\n'
+            '!pip install --no-deps "xformers<=0.0.27" trl peft accelerate bitsandbytes\n'\
+            '\n'\
+            f"Otherwise in local machines, your xformers version of {xformers_version} is too new.\n"\
+            'Please downgrade xformers via `pip install --force-reinstall "xformers<=0.0.27"'
+        )
+    pass
 
-if   Version(torch_version) < Version("2.2.0") and Version(xformers_version) >= Version("0.0.24"):
-    raise ImportError(
-        f"Unsloth: You have torch = {torch_version} but xformers = {xformers_version}.\n"\
-        f"Please install xformers < 0.0.24 for torch = {torch_version}."
-    )
-elif Version(torch_version) < Version("2.3.0") and Version(xformers_version) >= Version("0.0.26"):
-    raise ImportError(
-        f"Unsloth: You have torch = {torch_version} but xformers = {xformers_version}.\n"\
-        f"Please install xformers < 0.0.26 for torch = {torch_version}."
-    )
-elif Version(torch_version) < Version("2.4.0") and Version(xformers_version) > Version("0.0.27"):
-    raise ImportError(
-        f"Unsloth: You have torch = {torch_version} but xformers = {xformers_version}.\n"\
-        f"Please install xformers <= 0.0.27 for torch = {torch_version}."
-    )
-pass
+    if   Version(torch_version) < Version("2.2.0") and Version(xformers_version) >= Version("0.0.24"):
+        raise ImportError(
+            f"Unsloth: You have torch = {torch_version} but xformers = {xformers_version}.\n"\
+            f"Please install xformers < 0.0.24 for torch = {torch_version}."
+        )
+    elif Version(torch_version) < Version("2.3.0") and Version(xformers_version) >= Version("0.0.26"):
+        raise ImportError(
+            f"Unsloth: You have torch = {torch_version} but xformers = {xformers_version}.\n"\
+            f"Please install xformers < 0.0.26 for torch = {torch_version}."
+        )
+    elif Version(torch_version) < Version("2.4.0") and Version(xformers_version) > Version("0.0.27"):
+        raise ImportError(
+            f"Unsloth: You have torch = {torch_version} but xformers = {xformers_version}.\n"\
+            f"Please install xformers <= 0.0.27 for torch = {torch_version}."
+        )
+    pass
 
-from xformers._cpp_lib import _register_extensions
-try:
-    _register_extensions() # Check if C++ modules are loaded correctly
-except Exception as error:
-    raise ImportError(
-        "Unsloth: Xformers was not installed correctly.\n"\
-        "Please install xformers separately first.\n"\
-        "Then confirm if it's correctly installed by running:\n"\
-        "python -m xformers.info\n\n"
-        "Longer error message:\n" + str(error)
-    )
-pass
-import xformers.ops.fmha as xformers
-xformers_attention = xformers.memory_efficient_attention """
+    from xformers._cpp_lib import _register_extensions
+    try:
+        _register_extensions() # Check if C++ modules are loaded correctly
+    except Exception as error:
+        raise ImportError(
+            "Unsloth: Xformers was not installed correctly.\n"\
+            "Please install xformers separately first.\n"\
+            "Then confirm if it's correctly installed by running:\n"\
+            "python -m xformers.info\n\n"
+            "Longer error message:\n" + str(error)
+        )
+    pass
+    import xformers.ops.fmha as xformers
+    xformers_attention = xformers.memory_efficient_attention
 
 # Check TRL version
 from trl import __version__ as trl_version
@@ -298,24 +310,25 @@ pass
 # Fix new Xformers versions TypeError: Multiple dispatch failed for 'torch._ops.aten.to.dtype_layout'
 accelerate_old_send_to_device = None
 accelerate_new_send_to_device = None
-# KCT : xformers
-""" if Version(xformers_version) >= Version("0.0.27"):
-    import accelerate.utils.operations
-    if hasattr(accelerate.utils.operations, "send_to_device") and \
-        accelerate.utils.operations.send_to_device.__name__ != "_fixed_send_to_device":
-        accelerate_old_send_to_device = accelerate.utils.operations.send_to_device
-        from accelerate.utils.operations import *
-        send_to_device = inspect.getsource(accelerate.utils.operations.send_to_device)
-        send_to_device = re.sub(
-            r"([ ]{4,})return tensor\.to\(device\)",
-            r"\1try: return tensor.to(device)\n\1except: return tensor",
-            send_to_device,
-        ).replace("def send_to_device", "def _fixed_send_to_device")
-        exec(send_to_device)
-        # accelerate.utils.operations.send_to_device = _fixed_send_to_device
-        accelerate_new_send_to_device = _fixed_send_to_device
+
+if HAS_XFORMERS:
+    if Version(xformers_version) >= Version("0.0.27"):
+        import accelerate.utils.operations
+        if hasattr(accelerate.utils.operations, "send_to_device") and \
+            accelerate.utils.operations.send_to_device.__name__ != "_fixed_send_to_device":
+            accelerate_old_send_to_device = accelerate.utils.operations.send_to_device
+            from accelerate.utils.operations import *
+            send_to_device = inspect.getsource(accelerate.utils.operations.send_to_device)
+            send_to_device = re.sub(
+                r"([ ]{4,})return tensor\.to\(device\)",
+                r"\1try: return tensor.to(device)\n\1except: return tensor",
+                send_to_device,
+            ).replace("def send_to_device", "def _fixed_send_to_device")
+            exec(send_to_device)
+            # accelerate.utils.operations.send_to_device = _fixed_send_to_device
+            accelerate_new_send_to_device = _fixed_send_to_device
+        pass
     pass
-pass """
 
 # Transformers 4.46 breaks dynamic caching. This is a hack
 import transformers.generation.configuration_utils
@@ -1101,14 +1114,14 @@ pass
 def check_nvidia():
     # Unsloth doesn't work yet on AMD devices - we're working on it!
     output = np.array([0,])
-# KCT CUDA
-    # try:
-    #     output = subprocess.check_output("nvidia-smi --query-gpu=memory.used --format=csv", shell = True)
-    #     output = re.findall(rb'([\d]{1,})[\s]{1,}M', output)
-    #     output = np.array([int(x.decode('utf-8'))/1024 for x in output])
-    # except:
-    #     if not torch.cuda.is_available():
-    #         raise RuntimeError("Unsloth: We do not support AMD / Intel machines yet - it is a work in progress!")    
+    if HAS_XPU == False:
+        try:
+            output = subprocess.check_output("nvidia-smi --query-gpu=memory.used --format=csv", shell = True)
+            output = re.findall(rb'([\d]{1,})[\s]{1,}M', output)
+            output = np.array([int(x.decode('utf-8'))/1024 for x in output])
+        except:
+            if not torch.cuda.is_available():
+                raise RuntimeError("Unsloth: We do not support AMD / Intel machines yet - it is a work in progress!")    
     return output
 pass
 

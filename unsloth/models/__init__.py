@@ -14,7 +14,7 @@
 
 from .loader  import FastLanguageModel
 from .llama   import FastLlamaModel
-# KCT
+# KCT : Temp focus llama
 # from .mistral import FastMistralModel
 # from .qwen2   import FastQwen2Model
 from .dpo     import PatchDPOTrainer

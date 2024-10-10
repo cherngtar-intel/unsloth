@@ -12,10 +12,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# KCT : bitsandbytes
-# from bitsandbytes.nn import Linear4bit as Bnb_Linear4bit
-# from peft.tuners.lora import Linear4bit as Peft_Linear4bit
-# from peft.tuners.lora import Linear as Peft_Linear
+# KCT
+HAS_BNB = False
+if HAS_BNB:
+    from bitsandbytes.nn import Linear4bit as Bnb_Linear4bit
+    from peft.tuners.lora import Linear4bit as Peft_Linear4bit
+    from peft.tuners.lora import Linear as Peft_Linear
 from typing import Optional, Callable, Union, List
 import torch
 import os
@@ -138,34 +140,35 @@ pass
 def _merge_lora(layer, name):
 
     bias = None
-# KCT : bitsandbytes
-    W = layer.weight
-    return W, bias
-"""     if isinstance(layer, (Bnb_Linear4bit, Peft_Linear4bit, Peft_Linear)):
-        # Is LoRA so we need to merge!
-        W, quant_state, A, B, s, bias = get_lora_parameters_bias(layer)
-        if quant_state is not None:
-            dtype = quant_state.dtype if type(quant_state) is not list else quant_state[2]
-            W = fast_dequantize(W, quant_state)
-        else:
-            dtype = W.dtype
-        W = W.to(torch.float32).t()
-        # W = W.t()
+    if HAS_BNB:
+        if isinstance(layer, (Bnb_Linear4bit, Peft_Linear4bit, Peft_Linear)):
+            # Is LoRA so we need to merge!
+            W, quant_state, A, B, s, bias = get_lora_parameters_bias(layer)
+            if quant_state is not None:
+                dtype = quant_state.dtype if type(quant_state) is not list else quant_state[2]
+                W = fast_dequantize(W, quant_state)
+            else:
+                dtype = W.dtype
+            W = W.to(torch.float32).t()
+            # W = W.t()
 
-        if A is not None:
-            # sAB = (A.t().to(torch.float32) @ (s * B.t().to(torch.float32)))
-            # W += sAB
-            W.addmm_(A.t().to(torch.float32), B.t().to(torch.float32), alpha = s)
-            # W.addmm_(A.t().to(W.dtype), B.t().to(W.dtype), alpha = s)
-            # if not torch.isfinite(W).all():
-            maximum_element = torch.max(W.min().abs(), W.max())
-            if not torch.isfinite(maximum_element).item():
-                raise ValueError(f"Unsloth: Merge failed.\n{name} has some elements = infinity.")
-        pass
-        W = W.t().to(dtype)
+            if A is not None:
+                # sAB = (A.t().to(torch.float32) @ (s * B.t().to(torch.float32)))
+                # W += sAB
+                W.addmm_(A.t().to(torch.float32), B.t().to(torch.float32), alpha = s)
+                # W.addmm_(A.t().to(W.dtype), B.t().to(W.dtype), alpha = s)
+                # if not torch.isfinite(W).all():
+                maximum_element = torch.max(W.min().abs(), W.max())
+                if not torch.isfinite(maximum_element).item():
+                    raise ValueError(f"Unsloth: Merge failed.\n{name} has some elements = infinity.")
+            pass
+            W = W.t().to(dtype)
+        else:
+            W = layer.weight
+        return W, bias
     else:
         W = layer.weight
-    return W, bias """
+        return W, bias
 pass
 
 

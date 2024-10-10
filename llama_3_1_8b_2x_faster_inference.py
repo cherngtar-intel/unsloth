@@ -25,8 +25,15 @@ To install Unsloth on your own computer, follow the installation instructions on
 
 """If you want to finetune Llama-3 2x faster and use 70% less VRAM, go to our [finetuning notebook](https://colab.research.google.com/drive/135ced7oHytdxu3N2DNe1Z0kqjyYIkDXp?usp=sharing)!"""
 
-from unsloth import FastLanguageModel
+### Set Proxy ###
+# import os
+# os.environ['HTTP_PROXY'] = "http://proxy-dmz.intel.com:912"
+# os.environ['HTTPS_PROXY'] = "http://proxy-dmz.intel.com:912"
 
+from unsloth import FastLanguageModel
+import torch
+import timeit
+import time
 # 4bit pre quantized models we support for 4x faster downloading + no OOMs.
 fourbit_models = [
     "unsloth/mistral-7b-instruct-v0.2-bnb-4bit",
@@ -34,9 +41,15 @@ fourbit_models = [
 ] # More models at https://huggingface.co/unsloth
 
 model, tokenizer = FastLanguageModel.from_pretrained(
-    model_name = "unsloth/Meta-Llama-3.1-8B-Instruct",
+#    model_name = "/home/ct/unsloth-test/Llama-3.2-1B-Instruct",
+#    model_name = "unsloth/Meta-Llama-3.1-8B-Instruct",
+#    model_name = "meta-llama/Meta-Llama-3-8B-Instruct",
+#    model_name = "unsloth/Llama-3.2-3B-Instruct-bnb-4bit",
+    model_name = "meta-llama/Llama-3.2-1B-Instruct",
+#    model_name = "meta-llama/Llama-3.2-3B-Instruct",
     max_seq_length = 8192,
-    load_in_4bit = False,
+    load_in_4bit = False, # KCT : original value = True
+#    local_files_only = True,
     # token = "hf_...", # use one if using gated models like meta-llama/Llama-2-7b-hf
 )
 
@@ -54,22 +67,34 @@ FastLanguageModel.for_inference(model) # Enable native 2x faster inference
 Unsloth makes inference natively 2x faster!! No need to change or do anything!
 """
 model = model.to("xpu")
-messages = [
-                               # EDIT HERE!
-    {"from": "human", "value": "Continue the fibonnaci sequence: 1, 1, 2, 3, 5, 8,"},
-]
-inputs = tokenizer.apply_chat_template(messages, tokenize = True, add_generation_prompt = True, return_tensors = "pt").to("xpu")
 
-text_streamer = TextStreamer(tokenizer)
-_ = model.generate(input_ids = inputs, streamer = text_streamer, max_new_tokens = 1024, use_cache = True)
 
 # messages = [
-#     {"from": "human", "value": "Describe the tallest tower in the world."},
+#                                # EDIT HERE!
+#     {"from": "human", "value": "Continue the fibonnaci sequence: 1, 1, 2, 3, 5, 8,"},
 # ]
 # inputs = tokenizer.apply_chat_template(messages, tokenize = True, add_generation_prompt = True, return_tensors = "pt").to("xpu")
 
 # text_streamer = TextStreamer(tokenizer)
+
+# start_time = time.time()
 # _ = model.generate(input_ids = inputs, streamer = text_streamer, max_new_tokens = 1024, use_cache = True)
+# end_time = time.time()
+# print(f"Inference time: {end_time - start_time} seconds")
+
+
+messages = [
+    {"from": "human", "value": "Describe the tallest tower in the world."},
+]
+inputs = tokenizer.apply_chat_template(messages, tokenize = True, add_generation_prompt = True, return_tensors = "pt").to("xpu")
+
+text_streamer = TextStreamer(tokenizer)
+
+start_time = time.time()
+_ = model.generate(input_ids = inputs, streamer = text_streamer, max_new_tokens = 1024, use_cache = True)
+end_time = time.time()
+print(f"Inference time: {end_time - start_time} seconds")
+
 
 # messages = [
 #     {"from": "human", "value": "What is Unsloth?"},
@@ -77,7 +102,85 @@ _ = model.generate(input_ids = inputs, streamer = text_streamer, max_new_tokens 
 # inputs = tokenizer.apply_chat_template(messages, tokenize = True, add_generation_prompt = True, return_tensors = "pt").to("xpu")
 
 # text_streamer = TextStreamer(tokenizer)
+
+# start_time = time.time()
 # _ = model.generate(input_ids = inputs, streamer = text_streamer, max_new_tokens = 1024, use_cache = True)
+# end_time = time.time()
+# print(f"Inference time: {end_time - start_time} seconds")
+
+
+# messages = [
+#     {
+#         "role": "system",
+#         "content": "You are a skilled Python developer specializing in database management and optimization.",
+#     },
+#     {
+#         "role": "user",
+#         "content": "I'm experiencing a sorting issue in my database. Could you please provide Python code to help resolve this problem?",
+#     },
+# ]
+
+# inputs = tokenizer.apply_chat_template(messages, tokenize = True, add_generation_prompt = True, return_tensors = "pt").to("xpu")
+# text_streamer = TextStreamer(tokenizer)
+# start_time = time.time()
+# _ = model.generate(input_ids = inputs, streamer = text_streamer, max_new_tokens = 1024, use_cache = True)
+# end_time = time.time()
+# print(f"Inference time: {end_time - start_time} seconds")
+
+# Alternative (for reference)
+# prompt = tokenizer.apply_chat_template(messages, tokenize=False, add_generation_prompt=True)
+# inputs = tokenizer(prompt, return_tensors='pt', padding=True, truncation=True).to("xpu")
+# text_streamer = TextStreamer(tokenizer)
+# start_time = time.time()
+# _ = model.generate(**inputs, streamer = text_streamer, max_new_tokens = 128)
+# end_time = time.time()
+# print(f"Inference time: {end_time - start_time} seconds")
+
+
+
+
+### Profiling with timeit ###
+# warm up
+# for _ in range(3):
+#     _ = model.generate(input_ids = inputs, streamer = text_streamer, max_new_tokens = 1024, use_cache = True)
+
+# def run_inference():
+#     #torch.xpu.synchronize()
+#     _ = model.generate(input_ids = inputs, streamer = text_streamer, max_new_tokens = 1024, use_cache = True)
+#     #torch.xpu.synchronize()
+
+# iter = 5
+# inference_time = timeit.timeit(run_inference, number=iter)
+# print(f"Average inference time over {iter} runs: {inference_time / iter:.6f} seconds")
+### Profiling with timeit ###
+
+
+### Profiling with time ###
+# warm up
+# for _ in range(3):
+#     _ = model.generate(input_ids = inputs, streamer = text_streamer, max_new_tokens = 1024, use_cache = True)
+
+# iter = 5
+# start_time = time.time()
+# for _ in range(iter):
+#     #torch.xpu.synchronize()
+#     _ = model.generate(input_ids = inputs, streamer = text_streamer, max_new_tokens = 1024, use_cache = True)
+#     #torch.xpu.synchronize()
+# end_time = time.time()
+
+# print(f"Inference time: {(end_time - start_time)/iter:.6f} seconds")
+### Profiling with time ###
+
+
+### Profiling with torch profiler ###
+### https://pytorch.org/docs/stable/autograd.html#profiler ###
+# with torch.autograd.profiler.profile(use_device="xpu", use_kineto=True) as prof:
+#     # do what you want to profile here after the `with` statement with proper indent
+#     _ = model.generate(input_ids = inputs, streamer = text_streamer, max_new_tokens = 1024, use_cache = True)
+# print(prof.key_averages().table(sort_by="self_xpu_time_total"))
+### Profiling with torch profiler ###
+
+
 
 """And we're done! If you have any questions on Unsloth, we have a [Discord](https://discord.gg/u54VK8m8tk) channel! If you find any bugs or want to keep updated with the latest LLM stuff, or need help, join projects etc, feel free to join our Discord!
 

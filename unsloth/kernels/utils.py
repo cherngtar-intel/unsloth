@@ -12,6 +12,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+# KCT
+HAS_XPU = True
+HAS_BNB = False
+HAS_XFORMERS = False
+device_name = "xpu:0" if HAS_XPU else "cuda:0"
+
 import triton
 MAX_FUSED_SIZE : int = 65536
 next_power_of_2 = triton.next_power_of_2
@@ -23,11 +29,12 @@ if Version(torch.__version__) < Version("2.4.0"):
     torch_amp_custom_fwd = torch.cuda.amp.custom_fwd
     torch_amp_custom_bwd = torch.cuda.amp.custom_bwd
 else:
-# KCT : CUDA
-#    torch_amp_custom_fwd = torch.amp.custom_fwd(device_type = "cuda")
-#    torch_amp_custom_bwd = torch.amp.custom_bwd(device_type = "cuda")
-    torch_amp_custom_fwd = torch.amp.custom_fwd(device_type = "xpu")
-    torch_amp_custom_bwd = torch.amp.custom_bwd(device_type = "xpu")
+    if HAS_XPU:
+        torch_amp_custom_fwd = torch.amp.custom_fwd(device_type = "xpu")
+        torch_amp_custom_bwd = torch.amp.custom_bwd(device_type = "xpu")
+    else:
+        torch_amp_custom_fwd = torch.amp.custom_fwd(device_type = "cuda")
+        torch_amp_custom_bwd = torch.amp.custom_bwd(device_type = "cuda")
 pass
 
 
@@ -62,22 +69,23 @@ def calculate_settings(n : int) -> (int, int,):
 pass
 
 
-# KCT : bitsandbytes
 HAS_CUDA_STREAM = None
-#import bitsandbytes as bnb
-# https://github.com/bitsandbytes-foundation/bitsandbytes/pull/1330/files
-# HAS_CUDA_STREAM = Version(bnb.__version__) > Version("0.43.3")
+if HAS_BNB:
+    import bitsandbytes as bnb
+    # https://github.com/bitsandbytes-foundation/bitsandbytes/pull/1330/files
+    if HAS_XPU == False:
+        HAS_CUDA_STREAM = Version(bnb.__version__) > Version("0.43.3")
 global CUDA_STREAM
 CUDA_STREAM = None
-# KCT : bitsandbytes
-# get_ptr = bnb.functional.get_ptr
+if HAS_BNB:
+    get_ptr = bnb.functional.get_ptr
 import ctypes
-# KCT : bitsandbytes
-# cdequantize_blockwise_fp32      = bnb.functional.lib.cdequantize_blockwise_fp32
-# cdequantize_blockwise_fp16_nf4  = bnb.functional.lib.cdequantize_blockwise_fp16_nf4
-# cdequantize_blockwise_bf16_nf4  = bnb.functional.lib.cdequantize_blockwise_bf16_nf4
-# cgemm_4bit_inference_naive_fp16 = bnb.functional.lib.cgemm_4bit_inference_naive_fp16
-# cgemm_4bit_inference_naive_bf16 = bnb.functional.lib.cgemm_4bit_inference_naive_bf16
+if HAS_BNB:
+    cdequantize_blockwise_fp32      = bnb.functional.lib.cdequantize_blockwise_fp32
+    cdequantize_blockwise_fp16_nf4  = bnb.functional.lib.cdequantize_blockwise_fp16_nf4
+    cdequantize_blockwise_bf16_nf4  = bnb.functional.lib.cdequantize_blockwise_bf16_nf4
+    cgemm_4bit_inference_naive_fp16 = bnb.functional.lib.cgemm_4bit_inference_naive_fp16
+    cgemm_4bit_inference_naive_bf16 = bnb.functional.lib.cgemm_4bit_inference_naive_bf16
 
 
 def QUANT_STATE(W):
@@ -144,32 +152,28 @@ if HAS_CUDA_STREAM:
             absmax2, code2, blocksize2, _, _, _, _ = state2
         pass
         global CUDA_STREAM
-# KCT : CUDA
-        if CUDA_STREAM is None: CUDA_STREAM = torch.cuda.current_stream("xpu:0")
-#        if CUDA_STREAM is None: CUDA_STREAM = torch.cuda.current_stream("cuda:0")
+
+        if CUDA_STREAM is None: CUDA_STREAM = torch.cuda.current_stream("cuda:0")
 
         # Create weight matrix
         if out is None:
-# KCT : CUDA
-            out = torch.empty(shape, dtype = dtype, device = "xpu:0")
-#            out = torch.empty(shape, dtype = dtype, device = "cuda:0")
+            out = torch.empty(shape, dtype = dtype, device = "cuda:0")
         else:
             assert(out.shape == shape)
             assert(out.dtype == dtype)
 
         # NF4 dequantization of statistics
         n_elements_absmax = absmax.numel()
-# KCT : CUDA
-        out_absmax = torch.empty(n_elements_absmax, dtype = torch.float32, device = "xpu:0")
-#        out_absmax = torch.empty(n_elements_absmax, dtype = torch.float32, device = "cuda:0")
+
+        out_absmax = torch.empty(n_elements_absmax, dtype = torch.float32, device = "cuda:0")
 
         # Do dequantization
         ptr_out_absmax = get_ptr(out_absmax)
-# KCT : bitsandbytes
-        # cdequantize_blockwise_fp32(
-        #     get_ptr(code2), get_ptr(absmax), get_ptr(absmax2), ptr_out_absmax,
-        #     ctypes.c_int(blocksize2), ctypes.c_int(n_elements_absmax), CUDA_STREAM,
-        # )
+        if HAS_BNB:
+            cdequantize_blockwise_fp32(
+                get_ptr(code2), get_ptr(absmax), get_ptr(absmax2), ptr_out_absmax,
+                ctypes.c_int(blocksize2), ctypes.c_int(n_elements_absmax), CUDA_STREAM,
+            )
         out_absmax += offset
 
         fx = cdequantize_blockwise_fp16_nf4 if dtype == torch.float16 else \
@@ -205,26 +209,22 @@ else:
 
         # Create weight matrix
         if out is None:
-# KCT : CUDA
-            out = torch.empty(shape, dtype = dtype, device = "xpu:0")
-#            out = torch.empty(shape, dtype = dtype, device = "cuda:0")
+            out = torch.empty(shape, dtype = dtype, device = device_name)
         else:
             assert(out.shape == shape)
             assert(out.dtype == dtype)
 
         # NF4 dequantization of statistics
         n_elements_absmax = absmax.numel()
-# KCT : CUDA
-        out_absmax = torch.empty(n_elements_absmax, dtype = torch.float32, device = "xpu:0")
-#        out_absmax = torch.empty(n_elements_absmax, dtype = torch.float32, device = "cuda:0")
+        out_absmax = torch.empty(n_elements_absmax, dtype = torch.float32, device = device_name)
 
         # Do dequantization
         ptr_out_absmax = get_ptr(out_absmax)
-# KCT : bitsandbytes
-        # cdequantize_blockwise_fp32(
-        #     get_ptr(code2), get_ptr(absmax), get_ptr(absmax2), ptr_out_absmax,
-        #     ctypes.c_int(blocksize2), ctypes.c_int(n_elements_absmax),
-        # )
+        if HAS_BNB:
+            cdequantize_blockwise_fp32(
+                get_ptr(code2), get_ptr(absmax), get_ptr(absmax2), ptr_out_absmax,
+                ctypes.c_int(blocksize2), ctypes.c_int(n_elements_absmax),
+            )
         out_absmax += offset
 
         fx = cdequantize_blockwise_fp16_nf4 if dtype == torch.float16 else \
@@ -265,17 +265,14 @@ if HAS_CUDA_STREAM:
             absmax2, code2, blocksize2, _, _, _, _ = state2
         pass
         global CUDA_STREAM
-# KCT : CUDA
-        if CUDA_STREAM is None: CUDA_STREAM = torch.cuda.current_stream("xpu:0")
-#        if CUDA_STREAM is None: CUDA_STREAM = torch.cuda.current_stream("cuda:0")
+
+        if CUDA_STREAM is None: CUDA_STREAM = torch.cuda.current_stream("cuda:0")
         
         # assert(dtype == X.dtype)
         bout = shape[0]
 
         if out is None:
-# KCT : CUDA
-            out = torch.empty((1, 1, bout,), dtype = dtype, device = "xpu:0")
-#            out = torch.empty((1, 1, bout,), dtype = dtype, device = "cuda:0")
+            out = torch.empty((1, 1, bout,), dtype = dtype, device = "cuda:0")
         # else:
         #     assert(out.shape == (1, 1, bout,))
         # pass
@@ -293,14 +290,12 @@ if HAS_CUDA_STREAM:
         ldb = ctypes.c_int32(ldb)
         ldc = ctypes.c_int32(ldc)
 
-# KCT : CUDA
-        df = torch.empty(absmax.shape, dtype = torch.float32, device = "xpu:0")
-#        df = torch.empty(absmax.shape, dtype = torch.float32, device = "cuda:0")
-# KCT : bitsandbytes
-        # cdequantize_blockwise_fp32(
-        #     get_ptr(code2), get_ptr(absmax), get_ptr(absmax2), get_ptr(df),
-        #     ctypes.c_int(blocksize2), ctypes.c_int(df.numel()), CUDA_STREAM,
-        # )
+        df = torch.empty(absmax.shape, dtype = torch.float32, device = "cuda:0")
+        if HAS_BNB:
+            cdequantize_blockwise_fp32(
+                get_ptr(code2), get_ptr(absmax), get_ptr(absmax2), get_ptr(df),
+                ctypes.c_int(blocksize2), ctypes.c_int(df.numel()), CUDA_STREAM,
+            )
         df += offset
         absmax = df
 
@@ -342,9 +337,7 @@ else:
         bout = shape[0]
 
         if out is None:
-# KCT : CUDA
-            out = torch.empty((1, 1, bout,), dtype = dtype, device = "xpu:0")
-#            out = torch.empty((1, 1, bout,), dtype = dtype, device = "cuda:0")
+            out = torch.empty((1, 1, bout,), dtype = dtype, device = device_name)
         # else:
         #     assert(out.shape == (1, 1, bout,))
         # pass
@@ -362,14 +355,13 @@ else:
         ldb = ctypes.c_int32(ldb)
         ldc = ctypes.c_int32(ldc)
 
-# KCT : CUDA
-        df = torch.empty(absmax.shape, dtype = torch.float32, device = "xpu:0")
-#        df = torch.empty(absmax.shape, dtype = torch.float32, device = "cuda:0")
-# KCT : bitsandbytes
-        # cdequantize_blockwise_fp32(
-        #     get_ptr(code2), get_ptr(absmax), get_ptr(absmax2), get_ptr(df),
-        #     ctypes.c_int(blocksize2), ctypes.c_int(df.numel()),
-        # )
+        df = torch.empty(absmax.shape, dtype = torch.float32, device = device_name)
+
+        if HAS_BNB:
+            cdequantize_blockwise_fp32(
+                get_ptr(code2), get_ptr(absmax), get_ptr(absmax2), get_ptr(df),
+                ctypes.c_int(blocksize2), ctypes.c_int(df.numel()),
+            )
         df += offset
         absmax = df
 

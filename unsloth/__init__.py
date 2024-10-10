@@ -17,6 +17,11 @@ from packaging.version import Version
 import os, re, subprocess, inspect
 import numpy as np
 
+# KCT
+HAS_XPU = True
+HAS_BNB = False
+HAS_XFORMERS = False
+
 # # Define a list of modules to check
 # MODULES_TO_CHECK = ["bitsandbytes"]
 
@@ -90,53 +95,54 @@ elif (major_torch == 2) and (minor_torch < 2):
 pass
 
 # Torch 2.4 has including_emulation
-# KCT CUDA
-def is_bf16_supported(including_emulation = False):
-    return False
-# major_version, minor_version = torch.cuda.get_device_capability()
-# SUPPORTS_BFLOAT16 = (major_version >= 8)
+if HAS_XPU:
+    def is_bf16_supported(including_emulation = False):
+        return False
+else:
+    major_version, minor_version = torch.cuda.get_device_capability()
+    SUPPORTS_BFLOAT16 = (major_version >= 8)
 
-# old_is_bf16_supported = torch.cuda.is_bf16_supported
-# if "including_emulation" in str(inspect.signature(old_is_bf16_supported)):
-#     def is_bf16_supported(including_emulation = False):
-#         return old_is_bf16_supported(including_emulation)
-#     torch.cuda.is_bf16_supported = is_bf16_supported
-# else:
-#     def is_bf16_supported(): return SUPPORTS_BFLOAT16
-#     torch.cuda.is_bf16_supported = is_bf16_supported
-# pass
+    old_is_bf16_supported = torch.cuda.is_bf16_supported
+    if "including_emulation" in str(inspect.signature(old_is_bf16_supported)):
+        def is_bf16_supported(including_emulation = False):
+            return old_is_bf16_supported(including_emulation)
+        torch.cuda.is_bf16_supported = is_bf16_supported
+    else:
+        def is_bf16_supported(): return SUPPORTS_BFLOAT16
+        torch.cuda.is_bf16_supported = is_bf16_supported
+    pass
 
 # Try loading bitsandbytes and triton
-# KCT : bitsandbytes
-# import bitsandbytes as bnb
+if HAS_BNB:
+    import bitsandbytes as bnb
 
-# KCT : CUDA
-""" if "SPACE_AUTHOR_NAME" not in os.environ and "SPACE_REPO_NAME" not in os.environ:
+if HAS_XPU == False:
+    if "SPACE_AUTHOR_NAME" not in os.environ and "SPACE_REPO_NAME" not in os.environ:
 
-    import triton
-    libcuda_dirs = lambda: None
-    if Version(triton.__version__) >= Version("3.0.0"):
-        try: from triton.backends.nvidia.driver import libcuda_dirs
-        except: pass
-    else: from triton.common.build import libcuda_dirs
+        import triton
+        libcuda_dirs = lambda: None
+        if Version(triton.__version__) >= Version("3.0.0"):
+            try: from triton.backends.nvidia.driver import libcuda_dirs
+            except: pass
+        else: from triton.common.build import libcuda_dirs
 
-    try:
-# KCT : bitsandbytes
-#        cdequantize_blockwise_fp32 = bnb.functional.lib.cdequantize_blockwise_fp32
-        libcuda_dirs()
-    except:
-        warnings.warn(
-            "Unsloth: Running `ldconfig /usr/lib64-nvidia` to link CUDA."\
-        )
+        try:
+            if HAS_BNB:
+                cdequantize_blockwise_fp32 = bnb.functional.lib.cdequantize_blockwise_fp32
+            libcuda_dirs()
+        except:
+            warnings.warn(
+                "Unsloth: Running `ldconfig /usr/lib64-nvidia` to link CUDA."\
+            )
 
-        if os.path.exists("/usr/lib64-nvidia"):
-            os.system("ldconfig /usr/lib64-nvidia")
-        elif os.path.exists("/usr/local"):
-            # Sometimes bitsandbytes cannot be linked properly in Runpod for example
-            possible_cudas = subprocess.check_output(["ls", "-al", "/usr/local"]).decode("utf-8").split("\n")
-            find_cuda = re.compile(r"[\s](cuda\-[\d\.]{2,})$")
-            possible_cudas = [find_cuda.search(x) for x in possible_cudas]
-            possible_cudas = [x.group(1) for x in possible_cudas if x is not None]
+            if os.path.exists("/usr/lib64-nvidia"):
+                os.system("ldconfig /usr/lib64-nvidia")
+            elif os.path.exists("/usr/local"):
+                # Sometimes bitsandbytes cannot be linked properly in Runpod for example
+                possible_cudas = subprocess.check_output(["ls", "-al", "/usr/local"]).decode("utf-8").split("\n")
+                find_cuda = re.compile(r"[\s](cuda\-[\d\.]{2,})$")
+                possible_cudas = [find_cuda.search(x) for x in possible_cudas]
+                possible_cudas = [x.group(1) for x in possible_cudas if x is not None]
 
             # Try linking cuda folder, or everything in local
             if len(possible_cudas) == 0:

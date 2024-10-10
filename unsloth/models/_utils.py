@@ -16,6 +16,7 @@ __version__ = "2024.12.4"
 
 __all__ = [
     "prepare_model_for_kbit_training",
+# KCT : xformers
 #    "xformers",
 #    "xformers_attention",
 #    "xformers_version",
@@ -52,6 +53,10 @@ __all__ = [
     "unpatch_unsloth_gradient_checkpointing",
     "patch_gradient_checkpointing",
     "unpatch_gradient_checkpointing",
+ # KCT
+    "HAS_XPU",
+    "HAS_BNB",
+    "HAS_XFORMERS"
 
     "HAS_CUT_CROSS_ENTROPY",
     "EMPTY_LOGITS",
@@ -166,6 +171,11 @@ except:
 
 # =============================================
 
+# KCT
+HAS_XPU = True
+HAS_BNB = False
+HAS_XFORMERS = False
+
 # =============================================
 # Edits all Config files to enable RoPE Scaling for all models
 
@@ -230,11 +240,12 @@ if Version(torch_version) < Version("2.4.0"):
     torch_amp_custom_fwd = torch.cuda.amp.custom_fwd
     torch_amp_custom_bwd = torch.cuda.amp.custom_bwd
 else:
-# KCT : CUDA
-#    torch_amp_custom_fwd = torch.amp.custom_fwd(device_type = "cuda")
-#    torch_amp_custom_bwd = torch.amp.custom_bwd(device_type = "cuda")
-    torch_amp_custom_fwd = torch.amp.custom_fwd(device_type = "xpu")
-    torch_amp_custom_bwd = torch.amp.custom_bwd(device_type = "xpu")
+    if HAS_XPU:
+        torch_amp_custom_fwd = torch.amp.custom_fwd(device_type = "xpu")
+        torch_amp_custom_bwd = torch.amp.custom_bwd(device_type = "xpu")
+    else:
+        torch_amp_custom_fwd = torch.amp.custom_fwd(device_type = "cuda")
+        torch_amp_custom_bwd = torch.amp.custom_bwd(device_type = "cuda")
 pass
 # =============================================
 
@@ -276,14 +287,15 @@ pass
 
 # =============================================
 # Get Flash Attention v2 if Ampere (RTX 30xx, A100)
-# KCT :  no use bitbandbytes
-# import bitsandbytes as bnb
+if HAS_BNB:
+    import bitsandbytes as bnb
 from transformers import AutoTokenizer
 from transformers.utils.import_utils import _is_package_available
 
-# KCT CUDA
-major_version, minor_version = 0, 0
-# major_version, minor_version = torch.cuda.get_device_capability()
+if HAS_XPU:
+    major_version, minor_version = 0, 0
+else:
+    major_version, minor_version = torch.cuda.get_device_capability()
 SUPPORTS_BFLOAT16 = False
 HAS_FLASH_ATTENTION = False
 HAS_FLASH_ATTENTION_SOFTCAPPING = False
@@ -384,6 +396,7 @@ pass
 import xformers.ops.fmha as xformers
 xformers_attention = xformers.memory_efficient_attention """
 
+
 # Check TRL version
 from trl import __version__ as trl_version
 # Unsloth now supports all TRL versions!
@@ -406,7 +419,8 @@ pass
 # Fix new Xformers versions TypeError: Multiple dispatch failed for 'torch._ops.aten.to.dtype_layout'
 accelerate_old_send_to_device = None
 accelerate_new_send_to_device = None
-# KCT : xformers
+
+KCT : xformers
 """ if Version(xformers_version) >= Version("0.0.27"):
     import accelerate.utils.operations
     if hasattr(accelerate.utils.operations, "send_to_device") and \
@@ -455,6 +469,37 @@ patch_torch_compile(
     O3 = UNSLOTH_COMPILE_MAXIMUM,
     ignore_errors = UNSLOTH_COMPILE_IGNORE_ERRORS,
 )
+# Torch compile arguments
+torch_compile_arguments = [
+    "config.dce = True",
+    "config.memory_planning = True",
+    "config.memory_pool = 'combined'",
+    "config.coordinate_descent_tuning = True",
+    "config.max_autotune_gemm = False", # GEMM is unnecessary
+    "config.autotune_multi_device = False",
+    "config.max_autotune_gemm_backends = 'TRITON,ATEN,CPP'", # Not much faster
+    "config.aggressive_fusion = False", # Careful changes results!
+    "config.cuda.enable_cuda_lto = True",
+    "config.cuda.use_fast_math = True",
+    "config.cuda.compile_opt_level = '-O2'",
+]
+# Torch dynamo arguments
+torch_dynamo_arguments = [
+    "config.accumulated_cache_size_limit = 1024", # Bump up a bit from 256
+    "config.suppress_errors = True", # Supress errors for now
+    "config.do_not_emit_runtime_asserts = True",
+    "config.cache_size_limit = 1024", # Flex Attention
+]
+import torch._inductor.config as config
+for _try_compile_argument in torch_compile_arguments:
+    try:    exec(_try_compile_argument)
+    except: pass
+pass
+import torch._dynamo.config as config
+for _try_dynamo_argument in torch_dynamo_arguments:
+    try:    exec(_try_dynamo_argument)
+    except: pass
+pass
 
 torch_compile_options = {
     "epilogue_fusion"   : True,
@@ -955,14 +1000,14 @@ pass
 def check_nvidia():
     # Unsloth doesn't work yet on AMD devices - we're working on it!
     output = np.array([0,])
-# KCT CUDA
-    # try:
-    #     output = subprocess.check_output("nvidia-smi --query-gpu=memory.used --format=csv", shell = True)
-    #     output = re.findall(rb'([\d]{1,})[\s]{1,}M', output)
-    #     output = np.array([int(x.decode('utf-8'))/1024 for x in output])
-    # except:
-    #     if not torch.cuda.is_available():
-    #         raise RuntimeError("Unsloth: We do not support AMD / Intel machines yet - it is a work in progress!")    
+    if HAS_XPU == False:
+        try:
+            output = subprocess.check_output("nvidia-smi --query-gpu=memory.used --format=csv", shell = True)
+            output = re.findall(rb'([\d]{1,})[\s]{1,}M', output)
+            output = np.array([int(x.decode('utf-8'))/1024 for x in output])
+        except:
+            if not torch.cuda.is_available():
+                raise RuntimeError("Unsloth: We do not support AMD / Intel machines yet - it is a work in progress!")    
     return output
 pass
 

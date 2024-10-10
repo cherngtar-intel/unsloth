@@ -41,6 +41,10 @@ from unsloth_zoo.dataset_utils import (
 CHAT_TEMPLATES = {}
 DEFAULT_SYSTEM_MESSAGE = {}
 
+# KCT
+HAS_XPU = True
+device_name = "xpu" if HAS_XPU else "cuda"
+
 # =========================================== Unsloth
 # Unsloth efficient template leverages from Zephyr
 unsloth_template = \
@@ -1689,6 +1693,9 @@ extra_eos_tokens = None,
     ollama_eos = get_ollama_eos_tokens(tokenizer, extra_eos_tokens)
     ollama_eos = '\n'.join(f'PARAMETER stop "{eos}"' for eos in ollama_eos)
 
+    # Add temperature and min_p to counteract gibberish
+    ollama_eos += "\nPARAMETER temperature 1.5\nPARAMETER min_p 0.1"
+
     # Ollama modelfile
     part = '"""'
     modelfile = 'FROM {__FILE_LOCATION__}\n\n'\
@@ -1896,16 +1903,14 @@ def create_stopping_criteria(tokenizer, stop_word = "eos_token"):
     class StoppingCriteriaSub(StoppingCriteria):
         __slots__ = "stop_token", "single_match", "length",
 
-# KCT : CUDA
-#        def __init__(self, stops = "eos_token", device = "cuda", encounters = 1):
-        def __init__(self, stops = "eos_token", device = "xpu", encounters = 1):
+        def __init__(self, stops = "eos_token", device = device_name, encounters = 1):
             super().__init__()
             if stops == "eos_token":
-                self.stop_token = torch.tensor(tokenizer.eos_token_id, device = "xpu") # KCT : device = "cuda")
+                self.stop_token = torch.tensor(tokenizer.eos_token_id, device = device_name)
                 self.length = 1
             else:
                 self.stop_token = tokenizer(["\n" + stops], add_special_tokens = False, return_tensors = "pt")
-                self.stop_token = self.stop_token.input_ids.ravel()[1:].to("xpu") # KCT : .to("cuda")
+                self.stop_token = self.stop_token.input_ids.ravel()[1:].to(device_name)
                 self.length = self.stop_token.shape[0]
             pass
             self.single_match = self.length == 1

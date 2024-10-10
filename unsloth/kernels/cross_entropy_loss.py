@@ -24,7 +24,6 @@ from unsloth_zoo.loss_utils import (
     post_patch_loss_function,
 )
 
-
 @triton.heuristics({
     "DO_SOFTCAPPING":   lambda args: bool(args["DO_SOFTCAPPING"  ]),
     "DO_LOGIT_SCALING": lambda args: bool(args["DO_LOGIT_SCALING"]),
@@ -277,9 +276,8 @@ class Fast_CrossEntropyLoss(torch.autograd.Function):
 
         div, mod = divmod(vocab_size, MAX_FUSED_SIZE)
         n_chunks : int = div + (mod != 0)
-# KCT : CUDA
-        losses = torch.empty(n_rows, dtype = torch.float32, device = "xpu:0")
-#        losses = torch.empty(n_rows, dtype = torch.float32, device = "cuda:0")
+        
+        losses = torch.empty(n_rows, dtype = torch.float32, device = device_id)
 
         DO_SOFTCAPPING   : bool = bool(logit_softcapping != 0)
         DO_LOGIT_SCALING : bool = bool(logit_scaling != 0)
@@ -289,9 +287,8 @@ class Fast_CrossEntropyLoss(torch.autograd.Function):
         if n_chunks == 1:
             # For small vocabs <= 65336 like Llama, Mistral
             BLOCK_SIZE, num_warps = calculate_settings(vocab_size)
-# KCT : CUDA
-            logsumexp = torch.empty(n_rows, dtype = torch.float32, device = "xpu:0")
-#            logsumexp = torch.empty(n_rows, dtype = torch.float32, device = "cuda:0")
+
+            logsumexp = torch.empty(n_rows, dtype = torch.float32, device = device_id)
 
             _cross_entropy_forward[(n_rows,)](
                 logits, logits.stride(0),

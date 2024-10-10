@@ -15,6 +15,7 @@
 from ._utils import is_bfloat16_supported, HAS_FLASH_ATTENTION, HAS_FLASH_ATTENTION_SOFTCAPPING
 from .granite import FastGraniteModel
 from .llama   import FastLlamaModel, logger
+# KCT : Temp focus llama
 # from .mistral import FastMistralModel
 # from .qwen2   import FastQwen2Model
 # from .cohere  import FastCohereModel
@@ -39,7 +40,7 @@ SUPPORTS_GEMMA   = transformers_version >= Version("4.38")
 SUPPORTS_GEMMA2  = transformers_version >= Version("4.42")
 SUPPORTS_LLAMA31 = transformers_version >= Version("4.43.2")
 SUPPORTS_LLAMA32 = transformers_version  > Version("4.45.0")
-# KCT : gemma
+# KCT : Temp focus llama
 # SUPPORTS_GRANITE = transformers_version >= Version("4.46.0")
 # if SUPPORTS_GEMMA:
 #     from .gemma  import FastGemmaModel

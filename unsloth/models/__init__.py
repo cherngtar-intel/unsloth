@@ -16,6 +16,7 @@
 from .granite import FastGraniteModel
 from .loader  import FastLanguageModel, FastVisionModel
 from .llama   import FastLlamaModel
+# KCT : Temp focus llama
 # from .mistral import FastMistralModel
 # from .qwen2   import FastQwen2Model
 from .dpo     import PatchDPOTrainer, PatchKTOTrainer

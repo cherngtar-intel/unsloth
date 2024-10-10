@@ -156,13 +156,13 @@ pass
 class Slow_RoPE_Embedding(torch.autograd.Function):
     @staticmethod
     def forward(ctx, Q, cos, sin, position_ids):
+        # KCT : Goto here
         if position_ids is not None:
             # The first two dimensions of cos and sin are always 1, so we can `squeeze` them.
             cos = cos.squeeze(1).squeeze(0)  # [seq_len, dim]
             sin = sin.squeeze(1).squeeze(0)  # [seq_len, dim]
             cos = cos[position_ids].unsqueeze(1)  # [bs, 1, seq_len, dim]
             sin = sin[position_ids].unsqueeze(1)  # [bs, 1, seq_len, dim]
-
         # Q * cos + rotate_half(Q) * sin
         half = Q.shape[-1]//2
         RH_Q = torch.cat((-Q[..., half:], Q[..., :half]), dim = -1)
@@ -190,6 +190,7 @@ pass
 
 
 def inplace_rope_embedding(Q, K, cos, sin, position_ids):
+    # KCT : Goto here
     Q = Slow_RoPE_Embedding.apply(Q, cos, sin, position_ids)
     K = Slow_RoPE_Embedding.apply(K, cos, sin, position_ids)
     return Q, K

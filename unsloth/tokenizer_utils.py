@@ -35,6 +35,9 @@ from unsloth_zoo.training_utils import (
     fix_zero_training_loss,
 )
 
+# KCT
+HAS_XPU = True
+
 __all__ = [
     "load_correct_tokenizer",
     "fix_sentencepiece_tokenizer",
@@ -51,15 +54,13 @@ IGNORED_TOKENIZER_CHECKING = frozenset((
 
 
 IGNORED_TOKENIZER_NAMES = [
-    # "unsloth/Mistral-Nemo-Instruct-2407-bnb-4bit",
-    # "unsloth/Mistral-Nemo-Instruct-2407",
-    # "mistralai/Mistral-Nemo-Instruct-2407",
-    # "unsloth/Mistral-Nemo-Base-2407-bnb-4bit",
-    # "unsloth/Mistral-Nemo-Base-2407",
-    # "mistralai/Mistral-Nemo-Base-2407",
+    # Qwen Coder did not train on tool calling. Math did!
+    "unsloth/Qwen2.5-Coder-1.5B-Instruct",
+    "unsloth/Qwen2.5-Coder-7B-Instruct",
 ]
 IGNORED_TOKENIZER_NAMES = frozenset(
-    [x.lower() for x in IGNORED_TOKENIZER_NAMES]
+    [x.lower() for x in IGNORED_TOKENIZER_NAMES] + \
+    [x.lower()+"-bnb-4bit" for x in IGNORED_TOKENIZER_NAMES]
 )
 
 # Check environments
@@ -1138,17 +1139,50 @@ def add_new_tokens(
 pass
 
 
+@torch.inference_mode
+def fix_zero_training_loss(model, tokenizer, train_dataset):
+    """
+    Sometimes the labels get masked by all -100s, causing the loss
+    to be 0. We check for this!
+    """
+    if len(train_dataset) == 0: return
+
+    row = train_dataset[0]
+    if type(row) is dict and "labels" in row:
+
+        # Check the first 100 rows
+        seen_bad  = 0
+        seen_good = 0
+        for i, row in enumerate(train_dataset):
+            try:    check_tokens = list(set(row["labels"]))
+            except: continue
+            if len(check_tokens) == 1 and check_tokens[0] == -100: seen_bad += 1
+            else: seen_good += 1
+            if i >= 100: break
+        pass
+
+        # Check ratio
+        if seen_bad / (seen_bad + seen_good) >= 0.9:
+            logger.warning(
+                "Unsloth: Most labels in your dataset are -100. Training losses will be 0.\n"\
+                "For example, are you sure you used `train_on_responses_only` correctly?\n"\
+                "Or did you mask our tokens incorrectly? Maybe this is intended?"
+            )
+        pass
+    pass
+pass
+
 def check_nvidia():
     # Unsloth doesn't work yet on AMD devices - we're working on it!
     output = np.array([0,])
-# KCT CUDA
-    # try:
-    #     output = subprocess.check_output("nvidia-smi --query-gpu=memory.used --format=csv", shell = True)
-    #     output = re.findall(rb'([\d]{1,})[\s]{1,}M', output)
-    #     output = np.array([int(x.decode('utf-8'))/1024 for x in output])
-    # except:
-    #     if not torch.cuda.is_available():
-    #         raise RuntimeError("Unsloth: We do not support AMD / Intel machines yet - it is a work in progress!")
+    if HAS_XPU == False:
+        try:
+            output = subprocess.check_output("nvidia-smi --query-gpu=memory.used --format=csv", shell = True)
+            output = re.findall(rb'([\d]{1,})[\s]{1,}M', output)
+            output = np.array([int(x.decode('utf-8'))/1024 for x in output])
+        except:
+            if not torch.cuda.is_available():
+                raise RuntimeError("Unsloth: We do not support AMD / Intel machines yet - it is a work in progress!")
     return output
 pass
 PRE_CHECK = check_nvidia()

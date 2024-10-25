@@ -11,7 +11,6 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
 import torch
 import gc
 import math
@@ -72,6 +71,8 @@ from triton import __version__ as triton_version
 # KCT
 device_name = "xpu" if HAS_XPU else "cuda"
 device_id = "xpu:0" if HAS_XPU else "cuda:0"
+import time
+
 
 def original_apply_qkv(self, X):
     Q = self.q_proj(X)
@@ -452,14 +453,14 @@ def LlamaAttention_fast_forward(
             K = K.reshape(bsz, n_heads, kv_seq_len, head_dim)
             V = V.reshape(bsz, n_heads, kv_seq_len, head_dim)
         pass
-    # Must be contiguous or else results are False!
-    # https://github.com/pytorch/pytorch/issues/112577
-    Q, K, V = Q.contiguous(), K.contiguous(), V.contiguous()
-    # Needs (batch_size, n_heads, seq_len, head_dim)
-    # is_casual and attention_mask must not be both set!
-    A = scaled_dot_product_attention(Q, K, V, attn_mask = attention_mask, is_causal = False)
-    # Go back to (batch_size, seq_len, n_heads, head_dim)
-    A = A.transpose(1, 2).contiguous()
+        # Must be contiguous or else results are False!
+        # https://github.com/pytorch/pytorch/issues/112577
+        Q, K, V = Q.contiguous(), K.contiguous(), V.contiguous()
+        # Needs (batch_size, n_heads, seq_len, head_dim)
+        # is_casual and attention_mask must not be both set!
+        A = scaled_dot_product_attention(Q, K, V, attn_mask = attention_mask, is_causal = False)
+        # Go back to (batch_size, seq_len, n_heads, head_dim)
+        A = A.transpose(1, 2).contiguous()
 
     attn_output = A.reshape(bsz, q_len, n_heads*head_dim)
     attn_output = self.apply_o(self, attn_output)
@@ -571,7 +572,6 @@ def LlamaModel_fast_forward(
     return_dict:          Optional[bool] = None,
     *args, **kwargs,
 ) -> Union[Tuple, BaseModelOutputWithPast]:
-    
     output_attentions = output_attentions if output_attentions is not None else self.config.output_attentions
     assert(output_attentions is False)
     output_hidden_states = (
@@ -979,7 +979,12 @@ def CausalLM_fast_forward(fast_forward_inference):
         *args, **kwargs,
     ) -> Union[Tuple, CausalLMOutputWithPast]:
         
+        # KCT : Benchmark
+        start_time = 0
+        end_time = 0
+
         if past_key_values is not None:
+            #start_time = time.time()
             outputs = fast_forward_inference(
                 self,
                 input_ids,
@@ -990,7 +995,8 @@ def CausalLM_fast_forward(fast_forward_inference):
         else:
             if HAS_XFORMERS:
                 causal_mask = xformers.attn_bias.LowerTriangularMask()
-
+            # KCT : Benchmark
+            start_time = time.time()
             output_attentions = output_attentions if output_attentions is not None else self.config.output_attentions
             output_hidden_states = (
                 output_hidden_states if output_hidden_states is not None else self.config.output_hidden_states
@@ -1050,6 +1056,11 @@ def CausalLM_fast_forward(fast_forward_inference):
             pass
             logits = self.lm_head(hidden_states.to(lm_head.dtype))
         pass
+        # KCT : Benchmark
+        if start_time != 0:
+            end_time = time.time()
+            ttft_time = end_time - start_time
+            print(f"first_token_time: {ttft_time:.4f} seconds")
 
         torch_dtype = __DTYPE_MAP.get(self.config.torch_dtype, None)
         if torch_dtype is not None:
@@ -1691,6 +1702,7 @@ class FastLlamaModel:
             )
         pass
 
+
         # https://huggingface.co/togethercomputer/LLaMA-2-7B-32K/discussions/12
         # RoPE Scaling's max_position_embeddings must be updated
         max_position_embeddings = max(max_seq_length, model_max_seq_length)
@@ -1698,7 +1710,7 @@ class FastLlamaModel:
 
         # Cannot be None, since HF now checks for the config
         if load_in_4bit: kwargs["quantization_config"] = bnb_config
-        
+
         model = AutoModelForCausalLM.from_pretrained(
             model_name,
             device_map              = device_map,

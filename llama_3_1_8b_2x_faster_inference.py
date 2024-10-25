@@ -26,9 +26,9 @@ To install Unsloth on your own computer, follow the installation instructions on
 """If you want to finetune Llama-3 2x faster and use 70% less VRAM, go to our [finetuning notebook](https://colab.research.google.com/drive/135ced7oHytdxu3N2DNe1Z0kqjyYIkDXp?usp=sharing)!"""
 
 ### Set Proxy ###
-# import os
-# os.environ['HTTP_PROXY'] = "http://proxy-dmz.intel.com:912"
-# os.environ['HTTPS_PROXY'] = "http://proxy-dmz.intel.com:912"
+import os
+os.environ['HTTP_PROXY'] = "http://proxy-dmz.intel.com:912"
+os.environ['HTTPS_PROXY'] = "http://proxy-dmz.intel.com:912"
 
 from unsloth import FastLanguageModel
 import torch
@@ -44,11 +44,14 @@ model, tokenizer = FastLanguageModel.from_pretrained(
 #    model_name = "/home/ct/unsloth-test/Llama-3.2-1B-Instruct",
 #    model_name = "unsloth/Meta-Llama-3.1-8B-Instruct",
 #    model_name = "meta-llama/Meta-Llama-3-8B-Instruct",
+#    model_name = "meta-llama/Meta-Llama-3.1-8B-Instruct",
 #    model_name = "unsloth/Llama-3.2-3B-Instruct-bnb-4bit",
-    model_name = "meta-llama/Llama-3.2-1B-Instruct",
-#    model_name = "meta-llama/Llama-3.2-3B-Instruct",
+#    model_name = "unsloth/Meta-Llama-3.1-8B-Instruct-bnb-4bit",
+#    model_name = "meta-llama/Llama-3.2-1B-Instruct",
+    model_name = "meta-llama/Llama-3.2-3B-Instruct",
     max_seq_length = 8192,
     load_in_4bit = False, # KCT : original value = True
+    device_map = "xpu",
 #    local_files_only = True,
     # token = "hf_...", # use one if using gated models like meta-llama/Llama-2-7b-hf
 )
@@ -67,46 +70,90 @@ FastLanguageModel.for_inference(model) # Enable native 2x faster inference
 Unsloth makes inference natively 2x faster!! No need to change or do anything!
 """
 model = model.to("xpu")
+#model = model.half().to('xpu')
 
+# for name, param in model.named_parameters():
+#     print(f"Parameter: {name}, Data type: {param.dtype}")
 
 # messages = [
 #                                # EDIT HERE!
 #     {"from": "human", "value": "Continue the fibonnaci sequence: 1, 1, 2, 3, 5, 8,"},
 # ]
 # inputs = tokenizer.apply_chat_template(messages, tokenize = True, add_generation_prompt = True, return_tensors = "pt").to("xpu")
+# num_input_tokens = inputs.size(1)
 
 # text_streamer = TextStreamer(tokenizer)
 
 # start_time = time.time()
-# _ = model.generate(input_ids = inputs, streamer = text_streamer, max_new_tokens = 1024, use_cache = True)
+# output = model.generate(input_ids = inputs, streamer = text_streamer, max_new_tokens = 128, use_cache = True)
+# torch.xpu.synchronize()
 # end_time = time.time()
-# print(f"Inference time: {end_time - start_time} seconds")
+# output = output.cpu()
+# num_output_tokens = output.size(1)
+# num_generated_tokens = num_output_tokens - num_input_tokens
+# generation_time = end_time - start_time
+# throughput = num_generated_tokens / generation_time
+# print(f"num_input_tokens : {num_input_tokens}")
+# print(f"num_output_tokens : {num_output_tokens}")
+# print(f"Generated Tokens: {num_generated_tokens}")
+# print(f"Inference time: {generation_time:.4f} seconds")
+# print(f"Throughput: {throughput:.2f} tokens/second")
 
 
 messages = [
     {"from": "human", "value": "Describe the tallest tower in the world."},
 ]
 inputs = tokenizer.apply_chat_template(messages, tokenize = True, add_generation_prompt = True, return_tensors = "pt").to("xpu")
+num_input_tokens = inputs.size(1)
 
 text_streamer = TextStreamer(tokenizer)
 
+# warm up
+#_ = model.generate(input_ids = inputs, streamer = text_streamer, max_new_tokens = 128, use_cache = True)
+_ = model.generate(input_ids = inputs, max_new_tokens = 128, use_cache = True)
+
 start_time = time.time()
-_ = model.generate(input_ids = inputs, streamer = text_streamer, max_new_tokens = 1024, use_cache = True)
+#output = model.generate(input_ids = inputs, streamer = text_streamer, max_new_tokens = 128, use_cache = True)
+output = model.generate(input_ids = inputs, max_new_tokens = 128, use_cache = True)
+torch.xpu.synchronize()
 end_time = time.time()
-print(f"Inference time: {end_time - start_time} seconds")
+output = output.cpu()
+output_str = tokenizer.decode(output[0], skip_special_tokens=False)
+print(output_str)
+
+num_output_tokens = output.size(1)
+num_generated_tokens = num_output_tokens - num_input_tokens
+generation_time = end_time - start_time
+throughput = num_generated_tokens / generation_time
+print(f"num_input_tokens : {num_input_tokens}")
+print(f"num_output_tokens : {num_output_tokens}")
+print(f"Generated Tokens: {num_generated_tokens}")
+print(f"Inference time: {generation_time:.4f} seconds")
+print(f"Throughput: {throughput:.2f} tokens/second")
 
 
 # messages = [
 #     {"from": "human", "value": "What is Unsloth?"},
 # ]
 # inputs = tokenizer.apply_chat_template(messages, tokenize = True, add_generation_prompt = True, return_tensors = "pt").to("xpu")
+# num_input_tokens = inputs.size(1)
 
 # text_streamer = TextStreamer(tokenizer)
 
 # start_time = time.time()
-# _ = model.generate(input_ids = inputs, streamer = text_streamer, max_new_tokens = 1024, use_cache = True)
+# output = model.generate(input_ids = inputs, streamer = text_streamer, max_new_tokens = 1024, use_cache = True)
+# torch.xpu.synchronize()
 # end_time = time.time()
-# print(f"Inference time: {end_time - start_time} seconds")
+# output = output.cpu()
+# num_output_tokens = output.size(1)
+# num_generated_tokens = num_output_tokens - num_input_tokens
+# generation_time = end_time - start_time
+# throughput = num_generated_tokens / generation_time
+# print(f"num_input_tokens : {num_input_tokens}")
+# print(f"num_output_tokens : {num_output_tokens}")
+# print(f"Generated Tokens: {num_generated_tokens}")
+# print(f"Inference time: {generation_time:.4f} seconds")
+# print(f"Throughput: {throughput:.2f} tokens/second")
 
 
 # messages = [

@@ -199,8 +199,7 @@ pass
 from transformers import __version__ as transformers_version
 from transformers import PretrainedConfig
 # KCT : Temp focus llama
-model_architectures = ["llama"]
-# model_architectures = ["llama", "mistral", "gemma", "gemma2", "qwen2",]
+model_architectures = ["llama", "mistral",  "gemma", "gemma2", "qwen2"]
 
 for model_name in model_architectures:
     config_filepath = f"transformers.models.{model_name}.configuration_{model_name}"

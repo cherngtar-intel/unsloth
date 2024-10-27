@@ -13,9 +13,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 #
-#import os
-#os.environ['HTTP_PROXY'] = "http://proxy-dmz.intel.com:912"
-#os.environ['HTTPS_PROXY'] = "http://proxy-dmz.intel.com:912"
+import os
+os.environ['HTTP_PROXY'] = "http://proxy-dmz.intel.com:912"
+os.environ['HTTPS_PROXY'] = "http://proxy-dmz.intel.com:912"
 
 import torch
 import time
@@ -24,8 +24,8 @@ import argparse
 from transformers import AutoModelForCausalLM, AutoTokenizer
 from ipex_llm import optimize_model
 
-#from huggingface_hub import login
-#login(token = "hf_....")
+# from huggingface_hub import login
+# login(token = "hf_...")
 
 # you could tune the prompt based on your own model,
 # here the prompt tuning refers to https://llama.meta.com/docs/model-cards-and-prompt-formats/meta-llama-3
@@ -57,6 +57,14 @@ if __name__ == '__main__':
                         help='Max tokens to predict')
 
     args = parser.parse_args()
+    
+    # args.repo_id_or_model_path = "meta-llama/Meta-Llama-3-8B-Instruct"
+     args.repo_id_or_model_path = "meta-llama/Llama-3.2-3B-Instruct"
+    # args.repo_id_or_model_path = "meta-llama/Meta-Llama-3.1-8B-Instruct"
+    # args.repo_id_or_model_path = "HuggingFaceH4/zephyr-7b-beta"
+    # args.repo_id_or_model_path = "mistralai/Mistral-7B-Instruct-v0.2"
+    # args.repo_id_or_model_path = "microsoft/Phi-3-mini-4k-instruct"
+
     model_path = args.repo_id_or_model_path
 
     # Load model
@@ -69,7 +77,6 @@ if __name__ == '__main__':
     # With only one line to enable IPEX-LLM optimization on model
     # When running LLMs on Intel iGPUs for Windows users, we recommend setting `cpu_embedding=True` in the optimize_model function.
     # This will allow the memory-intensive embedding layer to utilize the CPU instead of iGPU.
-#    model = optimize_model(model)
     model = optimize_model(model, low_bit='fp16')
 
     # for name, param in model.named_parameters():
@@ -77,6 +84,9 @@ if __name__ == '__main__':
 
     model = model.to('xpu')
     #model = model.half().to('xpu')
+
+    # for name, param in model.named_parameters():
+    #     print(f"Parameter: {name}, Data type: {param.dtype}")
 
     # Load tokenizer
     tokenizer = AutoTokenizer.from_pretrained(model_path, trust_remote_code=True)

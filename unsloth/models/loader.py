@@ -16,8 +16,8 @@ from ._utils import is_bfloat16_supported, HAS_FLASH_ATTENTION, HAS_FLASH_ATTENT
 from .granite import FastGraniteModel
 from .llama   import FastLlamaModel, logger
 # KCT : Temp focus llama
-# from .mistral import FastMistralModel
-# from .qwen2   import FastQwen2Model
+from .mistral import FastMistralModel
+from .qwen2   import FastQwen2Model
 # from .cohere  import FastCohereModel
 from transformers import AutoConfig
 from transformers import __version__ as transformers_version

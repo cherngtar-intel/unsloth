@@ -12,8 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# KCT : Temp focus llama
-""" from .llama import *
+from .llama import *
 from ._utils import __version__
 import math
 
@@ -54,6 +53,9 @@ except:
     GemmaFlashAttention2 = GemmaAttention
 pass
 
+# KCT
+device_id = "xpu:0" if HAS_XPU else "cuda:0"
+
 
 torch_nn_functional_gelu = torch.nn.functional.gelu
 def fast_geglu_inference(self, X):
@@ -78,7 +80,9 @@ pass
 def GemmaDecoderLayer_fast_forward(
     self,
     hidden_states:        torch.Tensor,
-    causal_mask:          Optional[xformers.attn_bias.BlockDiagonalCausalMask] = None,
+# KCT : xformers
+    causal_mask:          Optional[bool] = None,
+#    causal_mask:          Optional[xformers.attn_bias.BlockDiagonalCausalMask] = None,
     attention_mask:       Optional[torch.Tensor] = None,
     position_ids:         Optional[torch.LongTensor] = None,
     past_key_value:       Optional[Tuple[torch.Tensor]] = None,
@@ -88,7 +92,7 @@ def GemmaDecoderLayer_fast_forward(
     *args, **kwargs,
 ):
     if use_cache and hasattr(self, "_flag_for_generation"): #past_key_value is not None:
-        out_weight = torch.empty(self.input_layernorm.weight.shape, dtype = torch.float32, device = "cuda:0")
+        out_weight = torch.empty(self.input_layernorm.weight.shape, dtype = torch.float32, device = device_id)
 
         # Self Attention
         residual = hidden_states
@@ -150,7 +154,7 @@ def GemmaModel_fast_forward_inference(
     position_ids,
     attention_mask = None,
 ):
-    out_weight = torch.empty_like(self.model.layers[0].input_layernorm.weight, dtype = torch.float32, device = "cuda:0")
+    out_weight = torch.empty_like(self.model.layers[0].input_layernorm.weight, dtype = torch.float32, device = device_id)
     input_ids = input_ids[:,:self.max_seq_length]
     hidden_states = self.model.embed_tokens(input_ids)
     hidden_states = hidden_states.to(self.config.torch_dtype)
@@ -238,8 +242,8 @@ class GemmaFixedRotaryEmbedding(torch.nn.Module):
 
         emb = torch.cat((radians_new, radians_new), dim = -1)
         # We must do RoPE in float32!
-        cos = emb.cos().to(device = "cuda:0", non_blocking = True)#, dtype = dtype)
-        sin = emb.sin().to(device = "cuda:0", non_blocking = True)#, dtype = dtype)
+        cos = emb.cos().to(device = device_id, non_blocking = True)#, dtype = dtype)
+        sin = emb.sin().to(device = device_id, non_blocking = True)#, dtype = dtype)
         self.register_buffer("cos_cached", cos, persistent = False)
         self.register_buffer("sin_cached", sin, persistent = False)
     pass
@@ -263,7 +267,7 @@ class GemmaFixedRotaryEmbedding(torch.nn.Module):
         if seq_len <= self.current_rope_size: return
         # Iteratively grow by increments of 8192
         self.current_rope_size = math.ceil(seq_len / 8192) * 8192
-        self._set_cos_sin_cache(self.current_rope_size, device = "cuda:0", dtype = x.dtype)
+        self._set_cos_sin_cache(self.current_rope_size, device = device_id, dtype = x.dtype)
     pass
 pass
 
@@ -297,8 +301,8 @@ class GemmaFixedLinearScalingRotaryEmbedding(GemmaFixedRotaryEmbedding):
 
         emb = torch.cat((radians_new, radians_new), dim = -1)
         # We must do RoPE in float32!
-        cos = emb.cos().to(device = "cuda:0", non_blocking = True)#, dtype = dtype)
-        sin = emb.sin().to(device = "cuda:0", non_blocking = True)#, dtype = dtype)
+        cos = emb.cos().to(device = device_id, non_blocking = True)#, dtype = dtype)
+        sin = emb.sin().to(device = device_id, non_blocking = True)#, dtype = dtype)
         self.register_buffer("cos_cached", cos, persistent = False)
         self.register_buffer("sin_cached", sin, persistent = False)
     pass
@@ -378,4 +382,3 @@ class FastGemmaModel(FastLlamaModel):
         return model, tokenizer
     pass
 pass
- """

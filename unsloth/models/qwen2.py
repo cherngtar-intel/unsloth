@@ -12,8 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# KCT : Temp focus llama
-""" from .llama import *
+from .llama import *
 from .llama import (
     LlamaRotaryEmbedding,
     LlamaLinearScalingRotaryEmbedding,
@@ -101,4 +100,3 @@ class FastQwen2Model(FastLlamaModel):
         )
     pass
 pass
- """

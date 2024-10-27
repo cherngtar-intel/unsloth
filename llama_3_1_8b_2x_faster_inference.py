@@ -49,7 +49,21 @@ model, tokenizer = FastLanguageModel.from_pretrained(
 #    model_name = "unsloth/Meta-Llama-3.1-8B-Instruct-bnb-4bit",
 #    model_name = "meta-llama/Llama-3.2-1B-Instruct",
     model_name = "meta-llama/Llama-3.2-3B-Instruct",
-    max_seq_length = 8192,
+#    model_name = "unsloth/mistral-7b-instruct-v0.3-bnb-4bit",
+#    model_name = "mistralai/Mistral-7B-Instruct-v0.3",
+##    model_name = "mistralai/Mistral-7B-Instruct-v0.2",
+#    model_name = "unsloth/Phi-3-mini-4k-instruct-bnb-4bit",
+#    model_name = "unsloth/Phi-3.5-mini-instruct-bnb-4bit",
+#     model_name = "microsoft/Phi-3-mini-4k-instruct",
+#    model_name = "unsloth/gemma-2b-bnb-4bit",
+#    model_name = "unsloth/gemma-2-2b-bnb-4bit",
+#    model_name = "unsloth/gemma-2-2b-it-bnb-4bit",
+#    model_name = "unsloth/Qwen2.5-1.5B-Instruct-bnb-4bit",
+#    model_name = "Qwen/Qwen2.5-3B-Instruct",
+#    model_name = "unsloth/zephyr-sft-bnb-4bit",
+#    model_name = "HuggingFaceH4/mistral-7b-sft-beta",
+##    model_name = "HuggingFaceH4/zephyr-7b-beta",
+    max_seq_length = 2048, 
     load_in_4bit = False, # KCT : original value = True
     device_map = "xpu",
 #    local_files_only = True,
@@ -61,6 +75,12 @@ from unsloth.chat_templates import get_chat_template
 tokenizer = get_chat_template(
     tokenizer,
     chat_template = "llama-3.1",
+#    chat_template = "mistral",
+#    chat_template = "phi-3",
+#    chat_template = "phi-3.5",
+#    chat_template = "gemma",
+#    chat_template = "qwen2.5",
+#    chat_template = "zephyr",
     mapping = {"role" : "from", "content" : "value", "user" : "human", "assistant" : "gpt"}, # ShareGPT style
 )
 FastLanguageModel.for_inference(model) # Enable native 2x faster inference
@@ -113,13 +133,13 @@ text_streamer = TextStreamer(tokenizer)
 _ = model.generate(input_ids = inputs, max_new_tokens = 128, use_cache = True)
 
 start_time = time.time()
-#output = model.generate(input_ids = inputs, streamer = text_streamer, max_new_tokens = 128, use_cache = True)
-output = model.generate(input_ids = inputs, max_new_tokens = 128, use_cache = True)
+output = model.generate(input_ids = inputs, streamer = text_streamer, max_new_tokens = 128, use_cache = True)
+# output = model.generate(input_ids = inputs, max_new_tokens = 128, use_cache = True)
 torch.xpu.synchronize()
 end_time = time.time()
 output = output.cpu()
-output_str = tokenizer.decode(output[0], skip_special_tokens=False)
-print(output_str)
+#output_str = tokenizer.decode(output[0], skip_special_tokens=False)
+#print(output_str)
 
 num_output_tokens = output.size(1)
 num_generated_tokens = num_output_tokens - num_input_tokens

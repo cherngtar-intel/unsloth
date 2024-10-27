@@ -12,8 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# KCT : Temp focus llama
-""" from .llama import *
+from .llama import *
 import os
 from ._utils import __version__
 from .llama import (
@@ -37,11 +36,16 @@ except:
     MistralFlashAttention2 = MistralAttention
 pass
 
+# KCT
+device_id = "xpu:0" if HAS_XPU else "cuda:0"
+
 
 def MistralAttention_fast_forward(
     self,
     hidden_states:        torch.Tensor,
-    causal_mask:          Optional[xformers.attn_bias.BlockDiagonalCausalMask] = None,
+# KCT : xformers    
+    causal_mask:          Optional[bool] = None,
+#    causal_mask:          Optional[xformers.attn_bias.BlockDiagonalCausalMask] = None,
     attention_mask:       Optional[torch.Tensor] = None,
     position_ids:         Optional[torch.LongTensor] = None,
     past_key_value:       Optional[Tuple[torch.Tensor]] = None,
@@ -97,53 +101,71 @@ def MistralAttention_fast_forward(
     pass
     past_key_value = (K, V) if use_cache else None
 
-    # Attention module
-    if (not HAS_FLASH_ATTENTION and attention_mask is None):
-        # Xformers memory efficient attention
-        Q = Q.transpose(1, 2)
-        K = K.transpose(1, 2)
-        V = V.transpose(1, 2)
-        K_M = V_M = bsz * kv_seq_len
-        Q_M = bsz * q_len
+    if HAS_XFORMERS:
+        # Attention module
+        if (not HAS_FLASH_ATTENTION and attention_mask is None):
+            # Xformers memory efficient attention
+            Q = Q.transpose(1, 2)
+            K = K.transpose(1, 2)
+            V = V.transpose(1, 2)
+            K_M = V_M = bsz * kv_seq_len
+            Q_M = bsz * q_len
 
-        has_swa = isinstance(causal_mask, xformers.attn_bias.BlockDiagonalCausalMask)
+            has_swa = isinstance(causal_mask, xformers.attn_bias.BlockDiagonalCausalMask)
 
-        # Group query attention
-        K = K  .view(bsz, kv_seq_len, n_kv_heads,        1, head_dim)
-        V = V  .view(bsz, kv_seq_len, n_kv_heads,        1, head_dim)
-        K = K.expand(bsz, kv_seq_len, n_kv_heads, n_groups, head_dim)
-        V = V.expand(bsz, kv_seq_len, n_kv_heads, n_groups, head_dim)
-        if hidden_states.requires_grad:
-            K = K.reshape(bsz, kv_seq_len, n_heads, head_dim)
-            V = V.reshape(bsz, kv_seq_len, n_heads, head_dim)
+            # Group query attention
+            K = K  .view(bsz, kv_seq_len, n_kv_heads,        1, head_dim)
+            V = V  .view(bsz, kv_seq_len, n_kv_heads,        1, head_dim)
+            K = K.expand(bsz, kv_seq_len, n_kv_heads, n_groups, head_dim)
+            V = V.expand(bsz, kv_seq_len, n_kv_heads, n_groups, head_dim)
+            if hidden_states.requires_grad:
+                K = K.reshape(bsz, kv_seq_len, n_heads, head_dim)
+                V = V.reshape(bsz, kv_seq_len, n_heads, head_dim)
 
-            if has_swa:
-                Q = Q.view(1, Q_M, n_heads, head_dim)
-                K = K.view(1, K_M, n_heads, head_dim)
-                V = V.view(1, V_M, n_heads, head_dim)
+                if has_swa:
+                    Q = Q.view(1, Q_M, n_heads, head_dim)
+                    K = K.view(1, K_M, n_heads, head_dim)
+                    V = V.view(1, V_M, n_heads, head_dim)
+                pass
+            else:
+                # Xformers does support the forward pass though
+                Q = Q.view(bsz, q_len, n_kv_heads, n_groups, head_dim)
+
+                if has_swa:
+                    Q = Q.view(1, Q_M, n_kv_heads, n_groups, head_dim)
+                    K = K.view(1, K_M, n_kv_heads, n_groups, head_dim)
+                    V = V.view(1, V_M, n_kv_heads, n_groups, head_dim)
+                pass
             pass
+
+            A = xformers_attention(Q, K, V, attn_bias = causal_mask)
+            A = A.view(bsz, q_len, n_heads, head_dim)
+
+        elif HAS_FLASH_ATTENTION and attention_mask is None:
+            Q = Q.transpose(1, 2)
+            K = K.transpose(1, 2)
+            V = V.transpose(1, 2)
+            sw = getattr(self.config, "sliding_window", None)
+            sw = kv_seq_len if (sw is None or sw == "null") else sw
+            window = (-1, -1) if (kv_seq_len <= sw) else (sw, sw)
+            A = flash_attn_func(Q, K, V, causal = True, window_size = window)
         else:
-            # Xformers does support the forward pass though
-            Q = Q.view(bsz, q_len, n_kv_heads, n_groups, head_dim)
-
-            if has_swa:
-                Q = Q.view(1, Q_M, n_kv_heads, n_groups, head_dim)
-                K = K.view(1, K_M, n_kv_heads, n_groups, head_dim)
-                V = V.view(1, V_M, n_kv_heads, n_groups, head_dim)
-            pass
+            # Grouped query attention
+            # if n_groups != 1:
+            K = K[:, :, None, :, :].expand(bsz, n_kv_heads, n_groups, kv_seq_len, head_dim)
+            V = V[:, :, None, :, :].expand(bsz, n_kv_heads, n_groups, kv_seq_len, head_dim)
+            K = K.reshape(bsz, n_heads, kv_seq_len, head_dim)
+            V = V.reshape(bsz, n_heads, kv_seq_len, head_dim)
+            # pass
+            # Must be contiguous or else results are False!
+            # https://github.com/pytorch/pytorch/issues/112577
+            Q, K, V = Q.contiguous(), K.contiguous(), V.contiguous()
+            # Needs (batch_size, n_heads, seq_len, head_dim)
+            # is_casual and attention_mask must not be both set!
+            A = scaled_dot_product_attention(Q, K, V, attn_mask = attention_mask, is_causal = False)
+            # Go back to (batch_size, seq_len, n_heads, head_dim)
+            A = A.transpose(1, 2).contiguous()
         pass
-
-        A = xformers_attention(Q, K, V, attn_bias = causal_mask)
-        A = A.view(bsz, q_len, n_heads, head_dim)
-
-    elif HAS_FLASH_ATTENTION and attention_mask is None:
-        Q = Q.transpose(1, 2)
-        K = K.transpose(1, 2)
-        V = V.transpose(1, 2)
-        sw = getattr(self.config, "sliding_window", None)
-        sw = kv_seq_len if (sw is None or sw == "null") else sw
-        window = (-1, -1) if (kv_seq_len <= sw) else (sw, sw)
-        A = flash_attn_func(Q, K, V, causal = True, window_size = window)
     else:
         # Grouped query attention
         # if n_groups != 1:
@@ -160,8 +182,7 @@ def MistralAttention_fast_forward(
         A = scaled_dot_product_attention(Q, K, V, attn_mask = attention_mask, is_causal = False)
         # Go back to (batch_size, seq_len, n_heads, head_dim)
         A = A.transpose(1, 2).contiguous()
-    pass
-    
+
     attn_output = A.reshape(bsz, q_len, n_heads*head_dim)
     attn_output = self.apply_o(self, attn_output)
     attn_weights = None
@@ -172,7 +193,9 @@ pass
 def MistralForCausalLM_fast_forward(
     self,
     input_ids: torch.LongTensor = None,
-    causal_mask: Optional[xformers.attn_bias.BlockDiagonalCausalMask] = None,
+# KCT : xformers    
+    causal_mask: Optional[bool] = None,
+#    causal_mask: Optional[xformers.attn_bias.BlockDiagonalCausalMask] = None,
     attention_mask: Optional[torch.Tensor] = None,
     position_ids: Optional[torch.LongTensor] = None,
     past_key_values: Optional[List[torch.FloatTensor]] = None,
@@ -186,19 +209,20 @@ def MistralForCausalLM_fast_forward(
     *args, **kwargs,
 ) -> Union[Tuple, CausalLMOutputWithPast]:
 
-    if causal_mask is None and past_key_values is None:
-        bsz, q_len = input_ids.shape
-        sliding_window = getattr(self.config, "sliding_window", None)
-        if sliding_window is None or sliding_window == "null" or sliding_window <= 0:
-            causal_mask = xformers.attn_bias.LowerTriangularMask()
-        elif q_len <= sliding_window:
-            causal_mask = xformers.attn_bias.LowerTriangularMask()
-        else:
-            # Fix from https://github.com/Rypo
-            causal_mask = xformers.attn_bias.BlockDiagonalCausalMask\
-                .from_seqlens([q_len]*bsz)\
-                .make_local_attention(window_size = sliding_window)
-    pass
+    if HAS_XFORMERS:
+        if causal_mask is None and past_key_values is None:
+            bsz, q_len = input_ids.shape
+            sliding_window = getattr(self.config, "sliding_window", None)
+            if sliding_window is None or sliding_window == "null" or sliding_window <= 0:
+                causal_mask = xformers.attn_bias.LowerTriangularMask()
+            elif q_len <= sliding_window:
+                causal_mask = xformers.attn_bias.LowerTriangularMask()
+            else:
+                # Fix from https://github.com/Rypo
+                causal_mask = xformers.attn_bias.BlockDiagonalCausalMask\
+                    .from_seqlens([q_len]*bsz)\
+                    .make_local_attention(window_size = sliding_window)
+        pass
 
     output_attentions = output_attentions if output_attentions is not None else self.config.output_attentions
     output_hidden_states = (
@@ -250,7 +274,7 @@ def MistralForCausalLM_fast_forward(
         shift_logits = logits
         if not hasattr(self, "extra_ignored_labels"):
             # Fixes https://github.com/unslothai/unsloth/issues/10
-            self.extra_ignored_labels = torch.full((self.max_seq_length, 1), -100, device = "cuda:0")
+            self.extra_ignored_labels = torch.full((self.max_seq_length, 1), -100, device = device_id)
         pass
         
         shift_labels = torch.hstack((labels[..., 1:], self.extra_ignored_labels[:labels.shape[0]]))
@@ -360,4 +384,3 @@ class FastMistralModel(FastLlamaModel):
         )
     pass
 pass
- """

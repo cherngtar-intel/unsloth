@@ -59,12 +59,14 @@ if __name__ == '__main__':
     args = parser.parse_args()
     
     # args.repo_id_or_model_path = "meta-llama/Meta-Llama-3-8B-Instruct"
-     args.repo_id_or_model_path = "meta-llama/Llama-3.2-3B-Instruct"
+    args.repo_id_or_model_path = "meta-llama/Llama-3.2-3B-Instruct"
     # args.repo_id_or_model_path = "meta-llama/Meta-Llama-3.1-8B-Instruct"
     # args.repo_id_or_model_path = "HuggingFaceH4/zephyr-7b-beta"
     # args.repo_id_or_model_path = "mistralai/Mistral-7B-Instruct-v0.2"
     # args.repo_id_or_model_path = "microsoft/Phi-3-mini-4k-instruct"
-
+    # args.repo_id_or_model_path = "Qwen/Qwen2.5-3B-Instruct"
+    # args.repo_id_or_model_path = "google/gemma-2b-it"
+ 
     model_path = args.repo_id_or_model_path
 
     # Load model
@@ -97,7 +99,7 @@ if __name__ == '__main__':
         tokenizer.convert_tokens_to_ids("<|eot_id|>"),
     ]
     
-    #args.prompt = "Describe the tallest tower in the world."
+    args.prompt = "Describe the tallest tower in the world."
 
     # Generate predicted tokens
     with torch.inference_mode():

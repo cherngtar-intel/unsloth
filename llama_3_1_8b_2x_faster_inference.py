@@ -34,6 +34,65 @@ from unsloth import FastLanguageModel
 import torch
 import timeit
 import time
+
+#model_name = "/home/ct/unsloth-test/Llama-3.2-1B-Instruct"
+model_name = "unsloth/Meta-Llama-3.1-8B-Instruct"
+#model_name = "meta-llama/Meta-Llama-3-8B-Instruct"
+#model_name = "meta-llama/Meta-Llama-3.1-8B-Instruct"
+#model_name = "unsloth/Llama-3.2-3B-Instruct-bnb-4bit"
+#model_name = "unsloth/Meta-Llama-3.1-8B-Instruct-bnb-4bit"
+#model_name = "meta-llama/Llama-3.2-1B-Instruct"
+##model_name = "meta-llama/Llama-3.2-3B-Instruct"
+#model_name = "unsloth/mistral-7b-instruct-v0.3-bnb-4bit"
+#model_name = "mistralai/Mistral-7B-Instruct-v0.3"
+##model_name = "mistralai/Mistral-7B-Instruct-v0.2"
+#model_name = "unsloth/Phi-3-mini-4k-instruct-bnb-4bit"
+#model_name = "unsloth/Phi-3.5-mini-instruct-bnb-4bit"
+##model_name = "microsoft/Phi-3-mini-4k-instruct"
+#model_name = "unsloth/gemma-2b-bnb-4bit"
+#model_name = "unsloth/gemma-2-2b-bnb-4bit"
+#model_name = "unsloth/gemma-2-2b-it-bnb-4bit"
+##model_name = "google/gemma-2b-it"
+#model_name = "google/gemma-7b-it"
+#model_name = "unsloth/Qwen2.5-1.5B-Instruct-bnb-4bit"
+#model_name = "Qwen/Qwen2.5-3B-Instruct"
+#model_name = "unsloth/zephyr-sft-bnb-4bit"
+#model_name = "HuggingFaceH4/mistral-7b-sft-beta"
+##model_name = "HuggingFaceH4/zephyr-7b-beta"
+
+chat_template_model = "llama-3.1",
+#chat_template_model = "mistral",
+#chat_template_model = "phi-3",
+#chat_template_model = "phi-3.5",
+#chat_template_model = "gemma",
+#chat_template_model = "qwen2.5",
+#chat_template_model = "zephyr",
+
+# Workaround for Phi-3, Mistral, Gemma problematic chat template
+USE_CHAT_TEMPLATE = False
+if not USE_CHAT_TEMPLATE:
+    from transformers import AutoTokenizer
+    # from huggingface_hub import login
+    # login(token = "hf_...")
+ 
+USE_TEXT_STREAMER = False
+USE_WARMUP = True
+
+def get_prompt(user_input: str, chat_history: list[tuple[str, str]],
+               system_prompt: str) -> str:
+    prompt_texts = [f'<|begin_of_text|>']
+
+    if system_prompt != '':
+        prompt_texts.append(f'<|start_header_id|>system<|end_header_id|>\n\n{system_prompt}<|eot_id|>')
+
+    for history_input, history_response in chat_history:
+        prompt_texts.append(f'<|start_header_id|>user<|end_header_id|>\n\n{history_input.strip()}<|eot_id|>')
+        prompt_texts.append(f'<|start_header_id|>assistant<|end_header_id|>\n\n{history_response.strip()}<|eot_id|>')
+
+    prompt_texts.append(f'<|start_header_id|>user<|end_header_id|>\n\n{user_input.strip()}<|eot_id|><|start_header_id|>assistant<|end_header_id|>\n\n')
+    return ''.join(prompt_texts)
+
+
 # 4bit pre quantized models we support for 4x faster downloading + no OOMs.
 fourbit_models = [
     "unsloth/mistral-7b-instruct-v0.2-bnb-4bit",
@@ -41,29 +100,8 @@ fourbit_models = [
 ] # More models at https://huggingface.co/unsloth
 
 model, tokenizer = FastLanguageModel.from_pretrained(
-#    model_name = "/home/ct/unsloth-test/Llama-3.2-1B-Instruct",
-#    model_name = "unsloth/Meta-Llama-3.1-8B-Instruct",
-#    model_name = "meta-llama/Meta-Llama-3-8B-Instruct",
-#    model_name = "meta-llama/Meta-Llama-3.1-8B-Instruct",
-#    model_name = "unsloth/Llama-3.2-3B-Instruct-bnb-4bit",
-#    model_name = "unsloth/Meta-Llama-3.1-8B-Instruct-bnb-4bit",
-#    model_name = "meta-llama/Llama-3.2-1B-Instruct",
-    model_name = "meta-llama/Llama-3.2-3B-Instruct",
-#    model_name = "unsloth/mistral-7b-instruct-v0.3-bnb-4bit",
-#    model_name = "mistralai/Mistral-7B-Instruct-v0.3",
-##    model_name = "mistralai/Mistral-7B-Instruct-v0.2",
-#    model_name = "unsloth/Phi-3-mini-4k-instruct-bnb-4bit",
-#    model_name = "unsloth/Phi-3.5-mini-instruct-bnb-4bit",
-#     model_name = "microsoft/Phi-3-mini-4k-instruct",
-#    model_name = "unsloth/gemma-2b-bnb-4bit",
-#    model_name = "unsloth/gemma-2-2b-bnb-4bit",
-#    model_name = "unsloth/gemma-2-2b-it-bnb-4bit",
-#    model_name = "unsloth/Qwen2.5-1.5B-Instruct-bnb-4bit",
-#    model_name = "Qwen/Qwen2.5-3B-Instruct",
-#    model_name = "unsloth/zephyr-sft-bnb-4bit",
-#    model_name = "HuggingFaceH4/mistral-7b-sft-beta",
-##    model_name = "HuggingFaceH4/zephyr-7b-beta",
-    max_seq_length = 2048, 
+    model_name = model_name,
+    max_seq_length = 2048,
     load_in_4bit = False, # KCT : original value = True
     device_map = "xpu",
 #    local_files_only = True,
@@ -71,18 +109,21 @@ model, tokenizer = FastLanguageModel.from_pretrained(
 )
 
 from transformers import TextStreamer
+
+### To test chat template
+# from unsloth.chat_templates import test_chat_templates
+# test_chat_templates()
+
 from unsloth.chat_templates import get_chat_template
-tokenizer = get_chat_template(
-    tokenizer,
-    chat_template = "llama-3.1",
-#    chat_template = "mistral",
-#    chat_template = "phi-3",
-#    chat_template = "phi-3.5",
-#    chat_template = "gemma",
-#    chat_template = "qwen2.5",
-#    chat_template = "zephyr",
-    mapping = {"role" : "from", "content" : "value", "user" : "human", "assistant" : "gpt"}, # ShareGPT style
-)
+if USE_CHAT_TEMPLATE:
+    tokenizer = get_chat_template(
+        tokenizer,
+        chat_template = chat_template_model,
+        mapping = {"role" : "from", "content" : "value", "user" : "human", "assistant" : "gpt"}, # ShareGPT style
+    )
+else:
+    tokenizer = AutoTokenizer.from_pretrained(model_name, trust_remote_code=True)
+
 FastLanguageModel.for_inference(model) # Enable native 2x faster inference
 
 """Change the "value" part to call the model!
@@ -92,54 +133,68 @@ Unsloth makes inference natively 2x faster!! No need to change or do anything!
 model = model.to("xpu")
 #model = model.half().to('xpu')
 
-# for name, param in model.named_parameters():
-#     print(f"Parameter: {name}, Data type: {param.dtype}")
 
-# messages = [
-#                                # EDIT HERE!
-#     {"from": "human", "value": "Continue the fibonnaci sequence: 1, 1, 2, 3, 5, 8,"},
-# ]
-# inputs = tokenizer.apply_chat_template(messages, tokenize = True, add_generation_prompt = True, return_tensors = "pt").to("xpu")
-# num_input_tokens = inputs.size(1)
+if USE_CHAT_TEMPLATE:
+    # messages = [
+    #     {"from": "human", "value": "Continue the fibonnaci sequence: 1, 1, 2, 3, 5, 8,"},
+    # ]
+    messages = [
+        {"role": "human", "content": "Describe the tallest tower in the world."},
+    ]
+    # messages = [
+    #     {"from": "human", "value": "What is Unsloth?"},
+    # ]
+    # messages = [
+    #     {"from": "human", "value": "What is AI?"},
+    # ]
 
-# text_streamer = TextStreamer(tokenizer)
+    inputs = tokenizer.apply_chat_template(messages, tokenize = True, add_generation_prompt = True, return_tensors = "pt").to("xpu")
+else:
+    # messages = "Continue the fibonnaci sequence: 1, 1, 2, 3, 5, 8,"
+    messages = "Describe the tallest tower in the world."
+    # messages = "What is Unsloth?"
+    # messages = "What is AI?"    
 
-# start_time = time.time()
-# output = model.generate(input_ids = inputs, streamer = text_streamer, max_new_tokens = 128, use_cache = True)
-# torch.xpu.synchronize()
-# end_time = time.time()
-# output = output.cpu()
-# num_output_tokens = output.size(1)
-# num_generated_tokens = num_output_tokens - num_input_tokens
-# generation_time = end_time - start_time
-# throughput = num_generated_tokens / generation_time
-# print(f"num_input_tokens : {num_input_tokens}")
-# print(f"num_output_tokens : {num_output_tokens}")
-# print(f"Generated Tokens: {num_generated_tokens}")
-# print(f"Inference time: {generation_time:.4f} seconds")
-# print(f"Throughput: {throughput:.2f} tokens/second")
+    terminators = [
+        tokenizer.eos_token_id,
+        tokenizer.convert_tokens_to_ids("<|eot_id|>"),
+    ]
 
+    DEFAULT_SYSTEM_PROMPT = """\
+    """
+    prompt = get_prompt(messages, [], system_prompt=DEFAULT_SYSTEM_PROMPT)
+    inputs = tokenizer.encode(prompt, return_tensors="pt").to('xpu')
 
-messages = [
-    {"from": "human", "value": "Describe the tallest tower in the world."},
-]
-inputs = tokenizer.apply_chat_template(messages, tokenize = True, add_generation_prompt = True, return_tensors = "pt").to("xpu")
 num_input_tokens = inputs.size(1)
 
-text_streamer = TextStreamer(tokenizer)
+if USE_TEXT_STREAMER:
+    text_streamer = TextStreamer(tokenizer)
 
 # warm up
-#_ = model.generate(input_ids = inputs, streamer = text_streamer, max_new_tokens = 128, use_cache = True)
-_ = model.generate(input_ids = inputs, max_new_tokens = 128, use_cache = True)
+if USE_WARMUP:
+    if USE_CHAT_TEMPLATE:
+        _ = model.generate(input_ids = inputs, max_new_tokens = 128, use_cache = True)
+    else:
+        _ = model.generate(input_ids = inputs, eos_token_id=terminators, max_new_tokens=128, use_cache = True)
+
 
 start_time = time.time()
-output = model.generate(input_ids = inputs, streamer = text_streamer, max_new_tokens = 128, use_cache = True)
-# output = model.generate(input_ids = inputs, max_new_tokens = 128, use_cache = True)
+if USE_CHAT_TEMPLATE:
+    if USE_TEXT_STREAMER:
+        output = model.generate(input_ids = inputs, streamer = text_streamer, max_new_tokens = 128, use_cache = True)
+    else:
+        output = model.generate(input_ids = inputs, max_new_tokens = 128, use_cache = True)
+else:
+    if USE_TEXT_STREAMER:
+        output = model.generate(input_ids = inputs, eos_token_id=terminators, streamer = text_streamer, max_new_tokens=128, use_cache = True)
+    else:
+        output = model.generate(input_ids = inputs, eos_token_id=terminators, max_new_tokens=128, use_cache = True)
 torch.xpu.synchronize()
 end_time = time.time()
 output = output.cpu()
-#output_str = tokenizer.decode(output[0], skip_special_tokens=False)
-#print(output_str)
+if not USE_TEXT_STREAMER:
+    output_str = tokenizer.decode(output[0], skip_special_tokens=False)
+    print(output_str)
 
 num_output_tokens = output.size(1)
 num_generated_tokens = num_output_tokens - num_input_tokens
@@ -151,29 +206,6 @@ print(f"Generated Tokens: {num_generated_tokens}")
 print(f"Inference time: {generation_time:.4f} seconds")
 print(f"Throughput: {throughput:.2f} tokens/second")
 
-
-# messages = [
-#     {"from": "human", "value": "What is Unsloth?"},
-# ]
-# inputs = tokenizer.apply_chat_template(messages, tokenize = True, add_generation_prompt = True, return_tensors = "pt").to("xpu")
-# num_input_tokens = inputs.size(1)
-
-# text_streamer = TextStreamer(tokenizer)
-
-# start_time = time.time()
-# output = model.generate(input_ids = inputs, streamer = text_streamer, max_new_tokens = 1024, use_cache = True)
-# torch.xpu.synchronize()
-# end_time = time.time()
-# output = output.cpu()
-# num_output_tokens = output.size(1)
-# num_generated_tokens = num_output_tokens - num_input_tokens
-# generation_time = end_time - start_time
-# throughput = num_generated_tokens / generation_time
-# print(f"num_input_tokens : {num_input_tokens}")
-# print(f"num_output_tokens : {num_output_tokens}")
-# print(f"Generated Tokens: {num_generated_tokens}")
-# print(f"Inference time: {generation_time:.4f} seconds")
-# print(f"Throughput: {throughput:.2f} tokens/second")
 
 
 # messages = [

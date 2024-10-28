@@ -233,6 +233,10 @@ def MistralForCausalLM_fast_forward(
     # decoder outputs consists of (dec_features, layer_state, dec_hidden, dec_attn)
     self.model._has_no_labels = labels is None
 
+    # KCT : Benchmark
+    start_time = 0
+    end_time = 0
+
     if past_key_values is not None:
         outputs = LlamaModel_fast_forward_inference(
             self,
@@ -242,6 +246,9 @@ def MistralForCausalLM_fast_forward(
             attention_mask = attention_mask,
         )
     else:
+        # KCT : Benchmark
+        start_time = time.time()
+
         outputs = self.model(
             input_ids=input_ids,
             causal_mask=causal_mask,
@@ -268,6 +275,12 @@ def MistralForCausalLM_fast_forward(
         logits = self.lm_head(hidden_states.to(lm_head.dtype))
     pass
     logits = logits.to(self.config.torch_dtype)
+
+    # KCT : Benchmark
+    if start_time != 0:
+        end_time = time.time()
+        ttft_time = end_time - start_time
+        print(f"first_token_time: {ttft_time:.4f} seconds")
 
     loss = None
     if labels is not None:

@@ -39,13 +39,16 @@ pass
 # KCT
 device_id = "xpu:0" if HAS_XPU else "cuda:0"
 
+if HAS_XFORMERS:
+    causal_mask_type = xformers.attn_bias.BlockDiagonalCausalMask
+else:
+    causal_mask_type = bool
+
 
 def MistralAttention_fast_forward(
     self,
     hidden_states:        torch.Tensor,
-# KCT : xformers    
-    causal_mask:          Optional[bool] = None,
-#    causal_mask:          Optional[xformers.attn_bias.BlockDiagonalCausalMask] = None,
+    causal_mask:          Optional[causal_mask_type] = None,
     attention_mask:       Optional[torch.Tensor] = None,
     position_ids:         Optional[torch.LongTensor] = None,
     past_key_value:       Optional[Tuple[torch.Tensor]] = None,
@@ -193,9 +196,7 @@ pass
 def MistralForCausalLM_fast_forward(
     self,
     input_ids: torch.LongTensor = None,
-# KCT : xformers    
-    causal_mask: Optional[bool] = None,
-#    causal_mask: Optional[xformers.attn_bias.BlockDiagonalCausalMask] = None,
+    causal_mask: Optional[causal_mask_type] = None,
     attention_mask: Optional[torch.Tensor] = None,
     position_ids: Optional[torch.LongTensor] = None,
     past_key_values: Optional[List[torch.FloatTensor]] = None,

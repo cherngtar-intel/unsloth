@@ -56,6 +56,11 @@ pass
 # KCT
 device_id = "xpu:0" if HAS_XPU else "cuda:0"
 
+if HAS_XFORMERS:
+    causal_mask_type = xformers.attn_bias.BlockDiagonalCausalMask
+else:
+    causal_mask_type = bool
+
 
 torch_nn_functional_gelu = torch.nn.functional.gelu
 def fast_geglu_inference(self, X):
@@ -80,9 +85,7 @@ pass
 def GemmaDecoderLayer_fast_forward(
     self,
     hidden_states:        torch.Tensor,
-# KCT : xformers
-    causal_mask:          Optional[bool] = None,
-#    causal_mask:          Optional[xformers.attn_bias.BlockDiagonalCausalMask] = None,
+    causal_mask:          Optional[causal_mask_type] = None,
     attention_mask:       Optional[torch.Tensor] = None,
     position_ids:         Optional[torch.LongTensor] = None,
     past_key_value:       Optional[Tuple[torch.Tensor]] = None,

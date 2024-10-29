@@ -59,6 +59,13 @@ pass
 if HAS_FLASH_ATTENTION_SOFTCAPPING:
     from flash_attn import flash_attn_func
 
+# KCT
+if HAS_XFORMERS:
+    causal_mask_type = xformers.attn_bias.BlockDiagonalCausalMask
+else:
+    causal_mask_type = bool
+
+
 # [TODO] We must randomnly use torch.compile?
 # Gemma 2 uses double RMS Layernorms, so the backward passes should not overwrite the gradients!
 @torch.compile(fullgraph = False, dynamic = True, options = torch_compile_options)
@@ -75,9 +82,7 @@ pass
 def Gemma2Attention_fast_forward(
     self,
     hidden_states:        torch.Tensor,
-# KCT : xformers
-    causal_mask:          Optional[bool] = None,
-#    causal_mask:          Optional[xformers.attn_bias.BlockDiagonalCausalMask] = None,
+    causal_mask:          Optional[causal_mask_type] = None,
     attention_mask:       Optional[torch.Tensor] = None,
     position_ids:         Optional[torch.LongTensor] = None,
     past_key_value:       Optional[Tuple[torch.Tensor]] = None,
@@ -171,9 +176,7 @@ pass
 def Gemma2DecoderLayer_fast_forward(
     self,
     hidden_states:        torch.Tensor,
-# KCT : xformers
-    causal_mask:          Optional[bool] = None,
-#    causal_mask:          Optional[xformers.attn_bias.BlockDiagonalCausalMask] = None,
+    causal_mask:          Optional[causal_mask_type] = None,
     attention_mask:       Optional[torch.Tensor] = None,
     position_ids:         Optional[torch.LongTensor] = None,
     past_key_value:       Optional[Tuple[torch.Tensor]] = None,

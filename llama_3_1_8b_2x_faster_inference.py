@@ -36,13 +36,13 @@ import timeit
 import time
 
 #model_name = "/home/ct/unsloth-test/Llama-3.2-1B-Instruct"
-model_name = "unsloth/Meta-Llama-3.1-8B-Instruct"
+##model_name = "unsloth/Meta-Llama-3.1-8B-Instruct"
 #model_name = "meta-llama/Meta-Llama-3-8B-Instruct"
-#model_name = "meta-llama/Meta-Llama-3.1-8B-Instruct"
+##model_name = "meta-llama/Meta-Llama-3.1-8B-Instruct"
 #model_name = "unsloth/Llama-3.2-3B-Instruct-bnb-4bit"
 #model_name = "unsloth/Meta-Llama-3.1-8B-Instruct-bnb-4bit"
 #model_name = "meta-llama/Llama-3.2-1B-Instruct"
-##model_name = "meta-llama/Llama-3.2-3B-Instruct"
+model_name = "meta-llama/Llama-3.2-3B-Instruct"
 #model_name = "unsloth/mistral-7b-instruct-v0.3-bnb-4bit"
 #model_name = "mistralai/Mistral-7B-Instruct-v0.3"
 ##model_name = "mistralai/Mistral-7B-Instruct-v0.2"
@@ -52,31 +52,34 @@ model_name = "unsloth/Meta-Llama-3.1-8B-Instruct"
 #model_name = "unsloth/gemma-2b-bnb-4bit"
 #model_name = "unsloth/gemma-2-2b-bnb-4bit"
 #model_name = "unsloth/gemma-2-2b-it-bnb-4bit"
-##model_name = "google/gemma-2b-it"
+#model_name = "google/gemma-2b-it"
 #model_name = "google/gemma-7b-it"
+#model_name = "google/gemma-2-2b-it"
+#model_name = "google/codegemma-2b"
 #model_name = "unsloth/Qwen2.5-1.5B-Instruct-bnb-4bit"
 #model_name = "Qwen/Qwen2.5-3B-Instruct"
 #model_name = "unsloth/zephyr-sft-bnb-4bit"
 #model_name = "HuggingFaceH4/mistral-7b-sft-beta"
-##model_name = "HuggingFaceH4/zephyr-7b-beta"
+#model_name = "HuggingFaceH4/zephyr-7b-beta"
 
-chat_template_model = "llama-3.1",
-#chat_template_model = "mistral",
-#chat_template_model = "phi-3",
-#chat_template_model = "phi-3.5",
-#chat_template_model = "gemma",
-#chat_template_model = "qwen2.5",
-#chat_template_model = "zephyr",
+chat_template_model = "llama-3.1"
+#chat_template_model = "mistral"
+#chat_template_model = "phi-3"
+#chat_template_model = "phi-3.5"
+#chat_template_model = "gemma"
+#chat_template_model = "qwen2.5"
+#chat_template_model = "zephyr"
 
 # Workaround for Phi-3, Mistral, Gemma problematic chat template
-USE_CHAT_TEMPLATE = False
+USE_CHAT_TEMPLATE = True
 if not USE_CHAT_TEMPLATE:
     from transformers import AutoTokenizer
     # from huggingface_hub import login
     # login(token = "hf_...")
  
-USE_TEXT_STREAMER = False
-USE_WARMUP = True
+USE_TEXT_STREAMER = True
+USE_WARMUP = False
+max_tokens = 32
 
 def get_prompt(user_input: str, chat_history: list[tuple[str, str]],
                system_prompt: str) -> str:
@@ -172,23 +175,24 @@ if USE_TEXT_STREAMER:
 
 # warm up
 if USE_WARMUP:
+    print("warm up...")
     if USE_CHAT_TEMPLATE:
-        _ = model.generate(input_ids = inputs, max_new_tokens = 128, use_cache = True)
+        _ = model.generate(input_ids = inputs, max_new_tokens = max_tokens, use_cache = True)
     else:
-        _ = model.generate(input_ids = inputs, eos_token_id=terminators, max_new_tokens=128, use_cache = True)
+        _ = model.generate(input_ids = inputs, eos_token_id=terminators, max_new_tokens=max_tokens, use_cache = True)
 
 
 start_time = time.time()
 if USE_CHAT_TEMPLATE:
     if USE_TEXT_STREAMER:
-        output = model.generate(input_ids = inputs, streamer = text_streamer, max_new_tokens = 128, use_cache = True)
+        output = model.generate(input_ids = inputs, streamer = text_streamer, max_new_tokens = max_tokens, use_cache = True)
     else:
-        output = model.generate(input_ids = inputs, max_new_tokens = 128, use_cache = True)
+        output = model.generate(input_ids = inputs, max_new_tokens = max_tokens, use_cache = True)
 else:
     if USE_TEXT_STREAMER:
-        output = model.generate(input_ids = inputs, eos_token_id=terminators, streamer = text_streamer, max_new_tokens=128, use_cache = True)
+        output = model.generate(input_ids = inputs, eos_token_id=terminators, streamer = text_streamer, max_new_tokens=max_tokens, use_cache = True)
     else:
-        output = model.generate(input_ids = inputs, eos_token_id=terminators, max_new_tokens=128, use_cache = True)
+        output = model.generate(input_ids = inputs, eos_token_id=terminators, max_new_tokens=max_tokens, use_cache = True)
 torch.xpu.synchronize()
 end_time = time.time()
 output = output.cpu()

@@ -73,6 +73,11 @@ device_name = "xpu" if HAS_XPU else "cuda"
 device_id = "xpu:0" if HAS_XPU else "cuda:0"
 import time
 
+if HAS_XFORMERS:
+    causal_mask_type = xformers.attn_bias.BlockDiagonalCausalMask
+else:
+    causal_mask_type = bool
+
 
 def original_apply_qkv(self, X):
     Q = self.q_proj(X)
@@ -338,9 +343,7 @@ pass
 def LlamaAttention_fast_forward(
     self,
     hidden_states:        torch.Tensor,
-# KCT : xformers
-    causal_mask:          Optional[bool] = None,
-#    causal_mask:          Optional[xformers.attn_bias.BlockDiagonalCausalMask] = None,
+    causal_mask:          Optional[causal_mask_type] = None,
     attention_mask:       Optional[torch.Tensor] = None,
     position_ids:         Optional[torch.LongTensor] = None,
     past_key_value:       Optional[Tuple[torch.Tensor]] = None,
@@ -559,9 +562,7 @@ __DTYPE_MAP = {
 def LlamaModel_fast_forward(
     self,
     input_ids:            torch.LongTensor,
-# KCT : xformers
-#    causal_mask:          Optional[xformers.attn_bias.BlockDiagonalCausalMask] = None,
-    causal_mask:          Optional[bool] = None,
+    causal_mask:          Optional[causal_mask_type] = None,
     attention_mask:       Optional[torch.Tensor] = None,
     position_ids:         Optional[torch.LongTensor] = None,
     past_key_values:      Optional[List[torch.FloatTensor]] = None,
@@ -963,9 +964,7 @@ def CausalLM_fast_forward(fast_forward_inference):
     def _CausalLM_fast_forward(
         self,
         input_ids: torch.LongTensor = None,
-# KCT : xformers
-        causal_mask: Optional[bool] = None,
-#        causal_mask: Optional[xformers.attn_bias.BlockDiagonalCausalMask] = None,
+        causal_mask: Optional[causal_mask_type] = None,
         attention_mask: Optional[torch.Tensor] = None,
         position_ids: Optional[torch.LongTensor] = None,
         past_key_values: Optional[List[torch.FloatTensor]] = None,

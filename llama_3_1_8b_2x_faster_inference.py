@@ -26,9 +26,9 @@ To install Unsloth on your own computer, follow the installation instructions on
 """If you want to finetune Llama-3 2x faster and use 70% less VRAM, go to our [finetuning notebook](https://colab.research.google.com/drive/135ced7oHytdxu3N2DNe1Z0kqjyYIkDXp?usp=sharing)!"""
 
 ### Set Proxy ###
-import os
-os.environ['HTTP_PROXY'] = "http://proxy-dmz.intel.com:912"
-os.environ['HTTPS_PROXY'] = "http://proxy-dmz.intel.com:912"
+# import os
+# os.environ['HTTP_PROXY'] = "http://proxy-dmz.intel.com:912"
+# os.environ['HTTPS_PROXY'] = "http://proxy-dmz.intel.com:912"
 
 from unsloth import FastLanguageModel
 import torch
@@ -52,7 +52,7 @@ model_name = "meta-llama/Llama-3.2-3B-Instruct"
 #model_name = "unsloth/gemma-2b-bnb-4bit"
 #model_name = "unsloth/gemma-2-2b-bnb-4bit"
 #model_name = "unsloth/gemma-2-2b-it-bnb-4bit"
-#model_name = "google/gemma-2b-it"
+##model_name = "google/gemma-2b-it"
 #model_name = "google/gemma-7b-it"
 #model_name = "google/gemma-2-2b-it"
 #model_name = "google/codegemma-2b"
@@ -60,7 +60,7 @@ model_name = "meta-llama/Llama-3.2-3B-Instruct"
 #model_name = "Qwen/Qwen2.5-3B-Instruct"
 #model_name = "unsloth/zephyr-sft-bnb-4bit"
 #model_name = "HuggingFaceH4/mistral-7b-sft-beta"
-#model_name = "HuggingFaceH4/zephyr-7b-beta"
+##model_name = "HuggingFaceH4/zephyr-7b-beta"
 
 chat_template_model = "llama-3.1"
 #chat_template_model = "mistral"
@@ -70,7 +70,7 @@ chat_template_model = "llama-3.1"
 #chat_template_model = "qwen2.5"
 #chat_template_model = "zephyr"
 
-# Workaround for Phi-3, Mistral, Gemma problematic chat template
+# Workaround for Phi-3, Mistral, Gemma problematic chat template, use USE_CHAT_TEMPLATE = False
 USE_CHAT_TEMPLATE = True
 if not USE_CHAT_TEMPLATE:
     from transformers import AutoTokenizer
@@ -79,7 +79,7 @@ if not USE_CHAT_TEMPLATE:
  
 USE_TEXT_STREAMER = True
 USE_WARMUP = False
-max_tokens = 32
+max_tokens = 128
 
 def get_prompt(user_input: str, chat_history: list[tuple[str, str]],
                system_prompt: str) -> str:

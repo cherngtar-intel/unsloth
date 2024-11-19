@@ -1,9 +1,9 @@
 from setuptools import setup, find_packages
 
 setup(
-    name='unsloth_ai_custom',      # Name of your customized package
-    version='0.0.2',               # Versioning of your package
-    description='Customized Unsloth AI for proprietary chatbot',
+    name='unsloth_ai_custom_xpu',  # Name of your customized package
+    version='0.0.3',               # Versioning of your package
+    description='Customized Unsloth AI for xpu',
     author='CT Khor',
     license='Apache License 2.0',
     packages=find_packages(),
@@ -21,7 +21,7 @@ setup(
         'trl>=0.7.9,!=0.9.0,!=0.9.1,!=0.9.2,!=0.9.3',
         'peft>=0.7.1,!=0.11.0',
         'protobuf<4.0.0',
-        'huggingface_hub',
+        'huggingface_hub==0.25.1',
         'hf_transfer',
     ]
 )

@@ -187,11 +187,9 @@ For **advanced installation instructions** or if you see weird errors during ins
 3. Install `xformers` manually. You can try installing `vllm` and seeing if `vllm` succeeds. Check if `xformers` succeeded with `python -m xformers.info` Go to https://github.com/facebookresearch/xformers. Another option is to install `flash-attn` for Ampere GPUs.
 4.  Finally, install `bitsandbytes` and check it with `python -m bitsandbytes`
 
-### Installation for Intel xpu
-Setup Prerequisites of Intel XPU backend for Triton:
 
-https://github.com/intel/intel-xpu-backend-for-triton?tab=readme-ov-file#prerequisites
-
+## Installation for Intel xpu
+Setup [Prerequisites](https://github.com/intel/intel-xpu-backend-for-triton?tab=readme-ov-file#prerequisites) of Intel XPU backend for Triton
 
 Clone this repository:
 ```
@@ -211,14 +209,18 @@ Install all dependencies listed in the requirements text file:
 ```
 pip install -r requirements.txt
 ```
+Initialize the toolchain
+```
+# replace /opt/intel/oneapi with the actual location of Intel® Deep Learning Essentials
+source /opt/intel/oneapi/setvars.sh
+```
 
-
-### To run Unsloth inference with xpu
+#### To run Unsloth inference with xpu
 ```
 python unsloth_inference.py
 ```
 
-### To run Unsloth backend server with Intel AI Assistant Client Application
+#### To run Unsloth backend server with Intel AI Assistant Client Application
 Install grpcio packages:
 ```
 pip install grpcio==1.66.1

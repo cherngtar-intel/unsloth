@@ -261,7 +261,7 @@ def unsloth_save_model(
 
     # Clean memory up first
     for _ in range(3):
-        torch.cuda.empty_cache()
+        torch.xpu.empty_cache()
         gc.collect()
     pass
 
@@ -714,13 +714,13 @@ def unsloth_save_model(
     for j, (key, value) in enumerate(state_dict.items()):
         state_dict[key] = None
         if j % 10 == 0:
-            torch.cuda.empty_cache()
+            torch.xpu.empty_cache()
             gc.collect()
         pass
     pass
     state_dict = None
     del state_dict
-    torch.cuda.empty_cache()
+    torch.xpu.empty_cache()
     gc.collect()
 
     # Remove temporary location
@@ -728,7 +728,7 @@ def unsloth_save_model(
     shutil.rmtree(temporary_location, ignore_errors = True)
 
     for _ in range(3):
-        torch.cuda.empty_cache()
+        torch.xpu.empty_cache()
         gc.collect()
     return save_directory, username
 pass

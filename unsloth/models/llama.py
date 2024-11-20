@@ -1715,7 +1715,7 @@ class FastLlamaModel:
             raise RuntimeError('Unsloth currently does not support multi GPU setups - but we are working on it!')
         for _ in range(3):
             gc.collect()
-            torch.cuda.empty_cache()"""
+            torch.xpu.empty_cache()"""
 
         debug_info = debug_info.split('\n')
         debug_info = "\n".join([debug_info[0]] + [spaces + x[8:] for x in debug_info[1:]])
@@ -1914,7 +1914,7 @@ class FastLlamaModel:
         # Clear deleted GPU items
         for _ in range(3):
             gc.collect()
-            torch.cuda.empty_cache()
+            torch.xpu.empty_cache()
         return model
     pass
 
@@ -2216,7 +2216,7 @@ class FastLlamaModel:
             # Remove old items to save VRAM
             for _ in range(3):
                 gc.collect()
-                torch.cuda.empty_cache()
+                torch.xpu.empty_cache()
             pass
 
             if train_lm_head:
@@ -2227,7 +2227,7 @@ class FastLlamaModel:
             # Remove old items to save VRAM
             for _ in range(3):
                 gc.collect()
-                torch.cuda.empty_cache()
+                torch.xpu.empty_cache()
             pass
         pass
 
@@ -2269,7 +2269,7 @@ class FastLlamaModel:
         # Clear deleted GPU items
         for _ in range(3):
             gc.collect()
-            torch.cuda.empty_cache()
+            torch.xpu.empty_cache()
         pass
 
         return model
@@ -2467,7 +2467,7 @@ class FastLlamaModel:
         # Clear deleted GPU items
         for _ in range(3):
             gc.collect()
-            torch.cuda.empty_cache()
+            torch.xpu.empty_cache()
         pass
         return model
     pass

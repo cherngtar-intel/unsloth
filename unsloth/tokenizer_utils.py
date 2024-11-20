@@ -991,7 +991,7 @@ def fix_untrained_tokens(model, tokenizer, train_dataset, eps = 1e-16):
     # Clean up
     for _ in range(3):
         gc.collect()
-        torch.cuda.empty_cache()
+        torch.xpu.empty_cache()
     pass
     return
 pass
@@ -1257,7 +1257,7 @@ def patch_sft_trainer_tokenizer():
         "    raise RuntimeError('Unsloth currently does not support multi GPU setups - but we are working on it!')\n"\
         "for _ in range(3):\n"\
         "    gc.collect()\n"\
-        "    torch.cuda.empty_cache()\n"\
+        "    torch.xpu.empty_cache()\n"\
         "pass\n"\
         "\n"\
         "fix_untrained_tokens(self.model, self.tokenizer, self.train_dataset, eps = 1e-16)\n\n"\

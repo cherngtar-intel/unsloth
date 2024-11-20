@@ -582,7 +582,7 @@ class FastGemma2Model(FastLlamaModel):
         import gc
         for _ in range(3):
             gc.collect()
-            torch.cuda.empty_cache()
+            torch.xpu.empty_cache()
         return model
     pass
 pass

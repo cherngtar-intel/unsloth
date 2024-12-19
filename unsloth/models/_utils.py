@@ -56,7 +56,7 @@ __all__ = [
  # KCT
     "HAS_XPU",
     "HAS_BNB",
-    "HAS_XFORMERS"
+    "HAS_XFORMERS",
 
     "HAS_CUT_CROSS_ENTROPY",
     "EMPTY_LOGITS",
@@ -66,11 +66,13 @@ __all__ = [
     "create_gradient_checkpointing_buffer",
 
     "patch_compiled_autograd",
-    "process_vision_info",
+    # "process_vision_info",
     "unsloth_compile_transformers",
     "patch_fast_lora",
 ]
 
+import sys
+import os
 import torch
 from typing import Union, Optional, List, Any, Callable, Tuple
 from platform import system as platform_system
@@ -78,6 +80,7 @@ platform_system = platform_system()
 import numpy as np
 import warnings, subprocess, re, inspect, psutil, os, math
 from packaging.version import Version
+sys.path.append(os.path.expanduser('~/unsloth/unsloth-zoo'))
 
 from unsloth_zoo.tokenizer_utils import (
     patch_tokenizer as _patch_tokenizer,
@@ -108,9 +111,9 @@ from unsloth_zoo.loss_utils import (
     HAS_CUT_CROSS_ENTROPY,
     fused_linear_cross_entropy,
 )
-from unsloth_zoo.vision_utils import (
-    process_vision_info,
-)
+# from unsloth_zoo.vision_utils import (
+#     process_vision_info,
+# )
 from unsloth_zoo.compiler import (
     get_transformers_model_type,
     unsloth_compile_transformers as _unsloth_compile_transformers,
@@ -419,7 +422,7 @@ pass
 accelerate_old_send_to_device = None
 accelerate_new_send_to_device = None
 
-KCT : xformers
+#KCT : xformers
 """ if Version(xformers_version) >= Version("0.0.27"):
     import accelerate.utils.operations
     if hasattr(accelerate.utils.operations, "send_to_device") and \

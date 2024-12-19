@@ -14,7 +14,8 @@
 
 
 from .granite import FastGraniteModel
-from .loader  import FastLanguageModel, FastVisionModel
+#from .loader  import FastLanguageModel, FastVisionModel
+from .loader  import FastLanguageModel
 from .llama   import FastLlamaModel
 # KCT : Temp focus llama
 # from .mistral import FastMistralModel

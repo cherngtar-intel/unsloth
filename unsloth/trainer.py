@@ -24,9 +24,9 @@ from . import is_bfloat16_supported
 from unsloth_zoo.training_utils import (
     unsloth_train as _unsloth_train,
 )
-from unsloth_zoo.vision_utils import (
-    UnslothVisionDataCollator,
-)
+# from unsloth_zoo.vision_utils import (
+#     UnslothVisionDataCollator,
+# )
 from packaging.version import Version
 import dataclasses
 
@@ -35,7 +35,7 @@ __all__ = [
     "UnslothTrainer",
     "unsloth_train",
     "_patch_trl_trainer",
-    "UnslothVisionDataCollator",
+    # "UnslothVisionDataCollator",
 ]
 
 # Unsloth gradient accumulation fix:

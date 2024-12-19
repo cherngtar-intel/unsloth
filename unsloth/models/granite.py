@@ -57,10 +57,15 @@ except:
     GraniteFlashAttention2 = GraniteAttention
 pass
 
+if HAS_XFORMERS:
+    causal_mask_type = xformers.attn_bias.BlockDiagonalCausalMask
+else:
+    causal_mask_type = bool
+
 def GraniteAttention_fast_forward(
     self,
     hidden_states:        torch.Tensor,
-    causal_mask:          Optional[xformers.attn_bias.BlockDiagonalCausalMask] = None,
+    causal_mask:          Optional[causal_mask_type] = None,
     attention_mask:       Optional[torch.Tensor] = None,
     position_ids:         Optional[torch.LongTensor] = None,
     past_key_value:       Optional[Tuple[torch.Tensor]] = None,
@@ -171,7 +176,7 @@ pass
 def GraniteDecoderLayer_fast_forward(
     self,
     hidden_states:        torch.Tensor,
-    causal_mask:          Optional[xformers.attn_bias.BlockDiagonalCausalMask] = None,
+    causal_mask:          Optional[causal_mask_type] = None,
     attention_mask:       Optional[torch.Tensor] = None,
     position_ids:         Optional[torch.LongTensor] = None,
     past_key_value:       Optional[Tuple[torch.Tensor]] = None,

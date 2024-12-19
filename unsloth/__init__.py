@@ -12,10 +12,14 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import os
+import sys
 import warnings, importlib, sys
 from packaging.version import Version
 import os, re, subprocess, inspect
 import numpy as np
+
+sys.path.append(os.path.expanduser('~/unsloth/unsloth-zoo'))
 
 # KCT
 HAS_XPU = True
@@ -176,7 +180,7 @@ if HAS_XPU == False:
                 "Unsloth will still run for now, but maybe it might crash - let's hope it works!"
             )
     pass
-pass """
+pass
 
 # Check for unsloth_zoo
 try:

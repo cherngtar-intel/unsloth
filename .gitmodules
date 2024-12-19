@@ -1,0 +1,4 @@
+[submodule "unsloth-zoo"]
+	path = unsloth-zoo
+	url = https://github.com/cherngtar-intel/unsloth-zoo.git
+	branch = unsloth_xpu_20241210

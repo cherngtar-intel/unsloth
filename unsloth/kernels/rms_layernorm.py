@@ -12,15 +12,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from unsloth_config import *
+
 import triton
 import triton.language as tl
 import torch
 from .utils import calculate_settings
 
-# KCT
-HAS_XPU = True
-device_name = "xpu" if HAS_XPU else "cuda"
-device_id = "xpu:0" if HAS_XPU else "cuda:0"
 
 @triton.jit
 def _rms_layernorm_forward(
@@ -36,7 +34,6 @@ def _rms_layernorm_forward(
         Inspiration from a Triton tutorial:
         https://triton-lang.org/main/getting-started/tutorials/05-layer-norm.html
     """
-    # KCT Goto here
     row_idx = tl.program_id(0)
     col_offsets = tl.arange(0, BLOCK_SIZE)
     mask = col_offsets < n_cols
@@ -181,7 +178,7 @@ class Fast_RMS_Layernorm(torch.autograd.Function):
         n_cols : int
         n_rows, n_cols = dY.shape
         # dW = X
-        dX = torch.empty_like(dY, device = "cuda:0") if ctx.GEMMA else dY
+        dX = torch.empty_like(dY, device = device_id) if ctx.GEMMA else dY
 
         _rms_layernorm_backward[(n_rows,)](
             dY, dY.stride(0),

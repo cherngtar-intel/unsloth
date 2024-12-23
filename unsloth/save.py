@@ -12,8 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# KCT
-HAS_BNB = False
+from unsloth_config import *
+
 if HAS_BNB:
     from bitsandbytes.nn import Linear4bit as Bnb_Linear4bit
     from peft.tuners.lora import Linear4bit as Peft_Linear4bit
@@ -152,8 +152,8 @@ pass
 
 def _merge_lora(layer, name):
 
-    bias = None
     if HAS_BNB:
+        bias = getattr(layer, "bias", None)
         if isinstance(layer, (Bnb_Linear4bit, Peft_Linear4bit, Peft_Linear)):
             # Is LoRA so we need to merge!
             W, quant_state, A, B, s, bias = get_lora_parameters_bias(layer)
@@ -180,6 +180,7 @@ def _merge_lora(layer, name):
             W = layer.weight
         return W, bias
     else:
+        bias = None
         W = layer.weight
         return W, bias
 pass
@@ -274,7 +275,8 @@ def unsloth_save_model(
 
     # Clean memory up first
     for _ in range(3):
-        torch.xpu.empty_cache()
+        if HAS_XPU: torch.xpu.empty_cache()
+        else: torch.cuda.empty_cache()
         gc.collect()
     pass
 
@@ -738,13 +740,15 @@ def unsloth_save_model(
     for j, (key, value) in enumerate(state_dict.items()):
         state_dict[key] = None
         if j % 10 == 0:
-            torch.xpu.empty_cache()
+            if HAS_XPU: torch.xpu.empty_cache()
+            else: torch.cuda.empty_cache()
             gc.collect()
         pass
     pass
     state_dict = None
     del state_dict
-    torch.xpu.empty_cache()
+    if HAS_XPU: torch.xpu.empty_cache()
+    else: torch.cuda.empty_cache()
     gc.collect()
 
     # Remove temporary location
@@ -752,7 +756,8 @@ def unsloth_save_model(
     shutil.rmtree(temporary_location, ignore_errors = True)
 
     for _ in range(3):
-        torch.xpu.empty_cache()
+        if HAS_XPU: torch.xpu.empty_cache()
+        else: torch.cuda.empty_cache()
         gc.collect()
     return save_directory, username
 pass

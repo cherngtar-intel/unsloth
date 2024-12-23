@@ -12,8 +12,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# KCT : Temp focus llama
-""" from .llama import *
+from unsloth_config import *
+
+from .llama import *
 from ._utils import __version__
 try:
     from transformers.models.cohere.modeling_cohere import (
@@ -69,7 +70,7 @@ pass
 def CohereAttention_fast_forward(
     self,
     hidden_states:        torch.Tensor,
-    causal_mask:          Optional[xformers.attn_bias.BlockDiagonalCausalMask] = None,
+    causal_mask:          Optional[causal_mask_type] = None,
     attention_mask:       Optional[torch.Tensor] = None,
     position_ids:         Optional[torch.LongTensor] = None,
     past_key_value:       Optional[Tuple[torch.Tensor]] = None,
@@ -184,7 +185,7 @@ pass
 def CohereDecoderLayer_fast_forward(
     self,
     hidden_states:        torch.Tensor,
-    causal_mask:          Optional[xformers.attn_bias.BlockDiagonalCausalMask] = None,
+    causal_mask:          Optional[causal_mask_type] = None,
     attention_mask:       Optional[torch.Tensor] = None,
     position_ids:         Optional[torch.LongTensor] = None,
     past_key_value:       Optional[Tuple[torch.Tensor]] = None,
@@ -194,7 +195,7 @@ def CohereDecoderLayer_fast_forward(
     *args, **kwargs,
 ):
     if use_cache and hasattr(self, "_flag_for_generation"): #past_key_value is not None:
-        out_weight = torch.empty(self.input_layernorm.weight.shape, dtype = torch.float32, device = "cuda:0")
+        out_weight = torch.empty(self.input_layernorm.weight.shape, dtype = torch.float32, device = device_id)
 
         # Self Attention
         residual = hidden_states
@@ -271,29 +272,29 @@ def CohereAttention_fast_forward_inference(
     # Prefill phase
     # if not hasattr(self, "paged_attention"):
     if do_prefill:
-        self.paged_attention = torch.empty((KV_CACHE_INCREMENT+seq_len+1, 2, bsz, n_kv_heads, head_dim), dtype = dtype, device = "cuda:0")
+        self.paged_attention = torch.empty((KV_CACHE_INCREMENT+seq_len+1, 2, bsz, n_kv_heads, head_dim), dtype = dtype, device = device_id)
         self.paged_attention_K = self.paged_attention[:,0]
         self.paged_attention_V = self.paged_attention[:,1]
         self.paged_attention_K[:seq_len] = K1.permute(2, 0, 1, 3)
         self.paged_attention_V[:seq_len] = V1.permute(2, 0, 1, 3)
-        self.temp_QA = torch.empty((2, bsz, 1, attention_size), dtype = dtype, device = "cuda:0")
-        self.temp_KV = torch.empty((2, bsz, 1, n_kv_heads*head_dim), dtype = dtype, device = "cuda:0")
-        self.RH_Q = torch.empty((bsz, n_heads, 1, head_dim), dtype = dtype, device = "cuda:0")
+        self.temp_QA = torch.empty((2, bsz, 1, attention_size), dtype = dtype, device = device_id)
+        self.temp_KV = torch.empty((2, bsz, 1, n_kv_heads*head_dim), dtype = dtype, device = device_id)
+        self.RH_Q = torch.empty((bsz, n_heads, 1, head_dim), dtype = dtype, device = device_id)
         
         # Mistral Nemo 12b has weird dimensions
         if attention_size != self.hidden_size:
-            self.temp_O = torch.empty((1, bsz, self.hidden_size), dtype = dtype, device = "cuda:0")
+            self.temp_O = torch.empty((1, bsz, self.hidden_size), dtype = dtype, device = device_id)
         else:
             self.temp_O = self.temp_QA[1][:,:,:self.hidden_size]
         pass
         
-        self.attention = torch.empty((bsz, n_heads, 1, KV_CACHE_INCREMENT+seq_len), dtype = dtype, device = "cuda:0")
+        self.attention = torch.empty((bsz, n_heads, 1, KV_CACHE_INCREMENT+seq_len), dtype = dtype, device = device_id)
         self.scalar = 1.0 / math_sqrt(self.head_dim)
         self.half_head_dim = head_dim // 2
         # Cohere has QK layernorms
         if self.use_qk_norm:
-            self.q_norm_out_weight = torch.empty(self.q_norm.weight.shape, dtype = torch.float32, device = "cuda:0")
-            self.k_norm_out_weight = torch.empty(self.k_norm.weight.shape, dtype = torch.float32, device = "cuda:0")
+            self.q_norm_out_weight = torch.empty(self.q_norm.weight.shape, dtype = torch.float32, device = device_id)
+            self.k_norm_out_weight = torch.empty(self.k_norm.weight.shape, dtype = torch.float32, device = device_id)
         else:
             self.q_norm_out_weight = None
             self.k_norm_out_weight = None
@@ -330,7 +331,7 @@ def CohereAttention_fast_forward_inference(
     Qn *= cos
     Qn.addcmul_(RH_Q, sin)
 
-    RH_K = RH_Q[:,:n_kv_heads,:,:] # torch.empty((n_kv_heads, 1, head_dim), dtype = dtype, device = "cuda:0")
+    RH_K = RH_Q[:,:n_kv_heads,:,:] # torch.empty((n_kv_heads, 1, head_dim), dtype = dtype, device = device_id)
     RH_K[:,:,:,:h] = Kn[:,:,:,h:]
     RH_K[:,:,:,h:] = Kn[:,:,:,:h]
     torch.neg(RH_K[:,:,:,:h], out = RH_K[:,:,:,:h])
@@ -395,7 +396,7 @@ def CohereModel_fast_forward_inference(
     position_ids,
     attention_mask = None,
 ):
-    out_weight = torch.empty_like(self.model.layers[0].input_layernorm.weight, dtype = torch.float32, device = "cuda:0")
+    out_weight = torch.empty_like(self.model.layers[0].input_layernorm.weight, dtype = torch.float32, device = device_id)
     input_ids = input_ids[:,:self.max_seq_length]
     hidden_states = self.model.embed_tokens(input_ids)
     hidden_states = hidden_states.to(self.config.torch_dtype)
@@ -471,4 +472,4 @@ class FastCohereModel(FastLlamaModel):
         transformers.models.cohere.modeling_cohere.CohereRotaryEmbedding = LlamaRotaryEmbedding
         return
     pass
-pass """
+pass

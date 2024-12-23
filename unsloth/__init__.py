@@ -12,19 +12,17 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import os
-import sys
+from unsloth_config import *
+
 import warnings, importlib, sys
 from packaging.version import Version
 import os, re, subprocess, inspect
 import numpy as np
 
-sys.path.append(os.path.expanduser('~/unsloth/unsloth-zoo'))
-
-# KCT
-HAS_XPU = True
-HAS_BNB = False
-HAS_XFORMERS = False
+# Adding unlosth-zoo into sys.path
+current_script_dir = os.path.dirname(os.path.abspath(__file__))
+base_dir = os.path.abspath(os.path.join(current_script_dir, '..'))
+sys.path.append(os.path.join(base_dir, 'unsloth-zoo'))
 
 # # Define a list of modules to check
 # MODULES_TO_CHECK = ["bitsandbytes"]
@@ -158,17 +156,15 @@ if HAS_XPU == False:
                 os.system(f"ldconfig /usr/local/{latest_cuda}")
         pass
 
-# KCT : bitsandbytes
-#        importlib.reload(bnb)
-#        importlib.reload(triton)
+        importlib.reload(bnb)
+        importlib.reload(triton)
         try:
             libcuda_dirs = lambda: None
             if Version(triton.__version__) >= Version("3.0.0"):
                 try: from triton.backends.nvidia.driver import libcuda_dirs
                 except: pass
             else: from triton.common.build import libcuda_dirs
-# KCT : bitsandbytes https://github.com/unslothai/unsloth/issues/200
-#            cdequantize_blockwise_fp32 = bnb.functional.lib.cdequantize_blockwise_fp32
+            cdequantize_blockwise_fp32 = bnb.functional.lib.cdequantize_blockwise_fp32
             libcuda_dirs()
         except:
             warnings.warn(

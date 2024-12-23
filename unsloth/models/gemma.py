@@ -12,6 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from unsloth_config import *
+
 from .llama import *
 from ._utils import __version__
 import math
@@ -53,14 +55,6 @@ except:
     GemmaFlashAttention2 = GemmaAttention
 pass
 
-# KCT
-device_id = "xpu:0" if HAS_XPU else "cuda:0"
-
-if HAS_XFORMERS:
-    causal_mask_type = xformers.attn_bias.BlockDiagonalCausalMask
-else:
-    causal_mask_type = bool
-
 
 torch_nn_functional_gelu = torch.nn.functional.gelu
 def fast_geglu_inference(self, X):
@@ -68,7 +62,7 @@ def fast_geglu_inference(self, X):
     # up   = self.up_proj(X)
     bsz, _, hd = X.shape
     # mlp_size = self.config.intermediate_size
-    # temp = torch.empty((2, bsz, 1, mlp_size), dtype = X.dtype, device = "cuda:0")
+    # temp = torch.empty((2, bsz, 1, mlp_size), dtype = X.dtype, device = device_id)
 
     gate = fast_linear_forward(self.gate_proj, X)#, out = temp[0])
     up   = fast_linear_forward(self.  up_proj, X)#, out = temp[1])
@@ -381,7 +375,8 @@ class FastGemmaModel(FastLlamaModel):
         import gc
         for _ in range(3):
             gc.collect()
-            torch.xpu.empty_cache()
-        return model
+            if HAS_XPU: torch.xpu.empty_cache()
+            else: torch.cuda.empty_cache()
+        return model, tokenizer
     pass
 pass

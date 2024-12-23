@@ -12,6 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from unsloth_config import *
+
 from .llama import *
 from ._utils import __version__
 from .gemma import (
@@ -58,13 +60,6 @@ pass
 
 if HAS_FLASH_ATTENTION_SOFTCAPPING:
     from flash_attn import flash_attn_func
-
-# KCT
-if HAS_XFORMERS:
-    causal_mask_type = xformers.attn_bias.BlockDiagonalCausalMask
-else:
-    causal_mask_type = bool
-
 
 # [TODO] We must randomnly use torch.compile?
 # Gemma 2 uses double RMS Layernorms, so the backward passes should not overwrite the gradients!
@@ -186,7 +181,7 @@ def Gemma2DecoderLayer_fast_forward(
     *args, **kwargs,
 ):
     if use_cache and hasattr(self, "_flag_for_generation"): #past_key_value is not None:
-        out_weight = torch.empty(self.input_layernorm.weight.shape, dtype = torch.float32, device = "cuda:0")
+        out_weight = torch.empty(self.input_layernorm.weight.shape, dtype = torch.float32, device = device_id)
 
         # Self Attention
         residual = hidden_states
@@ -274,17 +269,17 @@ def Gemma2Attention_fast_forward_inference(
     # Prefill phase
     # if not hasattr(self, "paged_attention"):
     if do_prefill:
-        self.paged_attention = torch.empty((KV_CACHE_INCREMENT+seq_len+1, 2, bsz, n_kv_heads, head_dim), dtype = dtype, device = "cuda:0")
+        self.paged_attention = torch.empty((KV_CACHE_INCREMENT+seq_len+1, 2, bsz, n_kv_heads, head_dim), dtype = dtype, device = device_id)
         self.paged_attention_K = self.paged_attention[:,0]
         self.paged_attention_V = self.paged_attention[:,1]
         self.paged_attention_K[:seq_len] = K1.permute(2, 0, 1, 3)
         self.paged_attention_V[:seq_len] = V1.permute(2, 0, 1, 3)
-        self.temp_QA = torch.empty((2, bsz, 1, attention_size), dtype = dtype, device = "cuda:0")
-        self.temp_KV = torch.empty((2, bsz, 1, n_kv_heads*head_dim), dtype = dtype, device = "cuda:0")
-        self.RH_Q = torch.empty((bsz, n_heads, 1, head_dim), dtype = dtype, device = "cuda:0")
+        self.temp_QA = torch.empty((2, bsz, 1, attention_size), dtype = dtype, device = device_id)
+        self.temp_KV = torch.empty((2, bsz, 1, n_kv_heads*head_dim), dtype = dtype, device = device_id)
+        self.RH_Q = torch.empty((bsz, n_heads, 1, head_dim), dtype = dtype, device = device_id)
         # Only for Gemma2
-        self.temp_O  = torch.empty((1, bsz, self.hidden_size), dtype = dtype, device = "cuda:0")
-        self.attention = torch.empty((bsz, n_heads, 1, KV_CACHE_INCREMENT+seq_len), dtype = dtype, device = "cuda:0")
+        self.temp_O  = torch.empty((1, bsz, self.hidden_size), dtype = dtype, device = device_id)
+        self.attention = torch.empty((bsz, n_heads, 1, KV_CACHE_INCREMENT+seq_len), dtype = dtype, device = device_id)
         
         # See https://github.com/google/gemma_pytorch/commit/03e657582d17cb5a8617ebf333c1c16f3694670e
         # Gemma 9b should use 256 and not 224 (hs / nah). 27b uses the below
@@ -322,7 +317,7 @@ def Gemma2Attention_fast_forward_inference(
     Qn *= cos
     Qn.addcmul_(RH_Q, sin)
 
-    RH_K = RH_Q[:,:n_kv_heads,:,:] # torch.empty((n_kv_heads, 1, head_dim), dtype = dtype, device = "cuda:0")
+    RH_K = RH_Q[:,:n_kv_heads,:,:] # torch.empty((n_kv_heads, 1, head_dim), dtype = dtype, device = device_id)
     RH_K[:,:,:,:h] = Kn[:,:,:,h:]
     RH_K[:,:,:,h:] = Kn[:,:,:,:h]
     torch.neg(RH_K[:,:,:,:h], out = RH_K[:,:,:,:h])
@@ -390,7 +385,7 @@ def Gemma2Model_fast_forward_inference(
     position_ids,
     attention_mask = None,
 ):
-    out_weight = torch.empty_like(self.model.layers[0].input_layernorm.weight, dtype = torch.float32, device = "cuda:0")
+    out_weight = torch.empty_like(self.model.layers[0].input_layernorm.weight, dtype = torch.float32, device = device_id)
     input_ids = input_ids[:,:self.max_seq_length]
     hidden_states = self.model.embed_tokens(input_ids)
     hidden_states = hidden_states.to(self.config.torch_dtype)
@@ -530,7 +525,8 @@ class FastGemma2Model(FastLlamaModel):
         import gc
         for _ in range(3):
             gc.collect()
-            torch.xpu.empty_cache()
+            if HAS_XPU: torch.xpu.empty_cache()
+            else: torch.cuda.empty_cache()
         return model, tokenizer
     pass
 pass

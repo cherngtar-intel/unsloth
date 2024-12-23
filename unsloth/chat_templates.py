@@ -12,6 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from unsloth_config import *
+
 __all__ = [
     "get_chat_template",
     "test_chat_templates",
@@ -40,10 +42,6 @@ from unsloth_zoo.dataset_utils import (
 )
 CHAT_TEMPLATES = {}
 DEFAULT_SYSTEM_MESSAGE = {}
-
-# KCT
-HAS_XPU = True
-device_name = "xpu" if HAS_XPU else "cuda"
 
 # =========================================== Unsloth
 # Unsloth efficient template leverages from Zephyr

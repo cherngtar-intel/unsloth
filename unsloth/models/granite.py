@@ -12,6 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from unsloth_config import *
+
 from .llama import *
 import os
 from ._utils import __version__
@@ -56,11 +58,6 @@ except:
     GraniteSdpaAttention   = GraniteAttention
     GraniteFlashAttention2 = GraniteAttention
 pass
-
-if HAS_XFORMERS:
-    causal_mask_type = xformers.attn_bias.BlockDiagonalCausalMask
-else:
-    causal_mask_type = bool
 
 def GraniteAttention_fast_forward(
     self,
@@ -274,17 +271,17 @@ def GraniteAttention_fast_forward_inference(
     # Prefill phase
     # if not hasattr(self, "paged_attention"):
     if do_prefill:
-        self.paged_attention = torch.empty((KV_CACHE_INCREMENT+seq_len+1, 2, bsz, n_kv_heads, head_dim), dtype = dtype, device = "cuda:0")
+        self.paged_attention = torch.empty((KV_CACHE_INCREMENT+seq_len+1, 2, bsz, n_kv_heads, head_dim), dtype = dtype, device = device_id)
         self.paged_attention_K = self.paged_attention[:,0]
         self.paged_attention_V = self.paged_attention[:,1]
         self.paged_attention_K[:seq_len] = K1.permute(2, 0, 1, 3)
         self.paged_attention_V[:seq_len] = V1.permute(2, 0, 1, 3)
-        self.temp_QA = torch.empty((2, bsz, 1, attention_size), dtype = dtype, device = "cuda:0")
-        self.temp_KV = torch.empty((2, bsz, 1, n_kv_heads*head_dim), dtype = dtype, device = "cuda:0")
-        self.RH_Q = torch.empty((bsz, n_heads, 1, head_dim), dtype = dtype, device = "cuda:0")
+        self.temp_QA = torch.empty((2, bsz, 1, attention_size), dtype = dtype, device = device_id)
+        self.temp_KV = torch.empty((2, bsz, 1, n_kv_heads*head_dim), dtype = dtype, device = device_id)
+        self.RH_Q = torch.empty((bsz, n_heads, 1, head_dim), dtype = dtype, device = device_id)
         # Only for Gemma2
-        self.temp_O  = torch.empty((1, bsz, self.hidden_size), dtype = dtype, device = "cuda:0")
-        self.attention = torch.empty((bsz, n_heads, 1, KV_CACHE_INCREMENT+seq_len), dtype = dtype, device = "cuda:0")
+        self.temp_O  = torch.empty((1, bsz, self.hidden_size), dtype = dtype, device = device_id)
+        self.attention = torch.empty((bsz, n_heads, 1, KV_CACHE_INCREMENT+seq_len), dtype = dtype, device = device_id)
 
 
         self.half_head_dim = head_dim // 2
@@ -315,7 +312,7 @@ def GraniteAttention_fast_forward_inference(
     Qn *= cos
     Qn.addcmul_(RH_Q, sin)
 
-    RH_K = RH_Q[:,:n_kv_heads,:,:] # torch.empty((n_kv_heads, 1, head_dim), dtype = dtype, device = "cuda:0")
+    RH_K = RH_Q[:,:n_kv_heads,:,:] # torch.empty((n_kv_heads, 1, head_dim), dtype = dtype, device = device_id)
     RH_K[:,:,:,:h] = Kn[:,:,:,h:]
     RH_K[:,:,:,h:] = Kn[:,:,:,:h]
     torch.neg(RH_K[:,:,:,:h], out = RH_K[:,:,:,:h])
@@ -521,7 +518,8 @@ class FastGraniteModel(FastLlamaModel):
         import gc
         for _ in range(3):
             gc.collect()
-            torch.cuda.empty_cache()
+            if HAS_XPU: torch.xpu.empty_cache()
+            else: torch.cuda.empty_cache()
         return model
     pass
 pass

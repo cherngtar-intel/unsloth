@@ -12,6 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from unsloth_config import *
+
 from .llama import *
 import os
 from ._utils import __version__
@@ -35,14 +37,6 @@ except:
     MistralSdpaAttention   = MistralAttention
     MistralFlashAttention2 = MistralAttention
 pass
-
-# KCT
-device_id = "xpu:0" if HAS_XPU else "cuda:0"
-
-if HAS_XFORMERS:
-    causal_mask_type = xformers.attn_bias.BlockDiagonalCausalMask
-else:
-    causal_mask_type = bool
 
 
 def MistralAttention_fast_forward(
@@ -234,9 +228,9 @@ def MistralForCausalLM_fast_forward(
     # decoder outputs consists of (dec_features, layer_state, dec_hidden, dec_attn)
     self.model._has_no_labels = labels is None
 
-    # KCT : Benchmark
-    start_time = 0
-    end_time = 0
+    if ENABLE_BENCHMARK:
+        start_time = 0
+        end_time = 0
 
     if past_key_values is not None:
         outputs = LlamaModel_fast_forward_inference(
@@ -247,8 +241,8 @@ def MistralForCausalLM_fast_forward(
             attention_mask = attention_mask,
         )
     else:
-        # KCT : Benchmark
-        start_time = time.time()
+        if ENABLE_BENCHMARK:
+            start_time = time.time()
 
         outputs = self.model(
             input_ids=input_ids,
@@ -277,11 +271,11 @@ def MistralForCausalLM_fast_forward(
     pass
     logits = logits.to(self.config.torch_dtype)
 
-    # KCT : Benchmark
-    if start_time != 0:
-        end_time = time.time()
-        ttft_time = end_time - start_time
-        print(f"first_token_time: {ttft_time:.4f} seconds")
+    if ENABLE_BENCHMARK:
+        if start_time != 0:
+            end_time = time.time()
+            ttft_time = end_time - start_time
+            print(f"first_token_time (mistral): {ttft_time:.4f} seconds")
 
     loss = None
     if labels is not None:

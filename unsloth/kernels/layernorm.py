@@ -13,6 +13,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from unsloth_config import *
+
 import triton
 import triton.language as tl
 import torch
@@ -21,10 +23,6 @@ from unsloth_zoo.patching_utils import (
     patch_layernorm,
 )
 
-# KCT
-HAS_XPU = True
-device_name = "xpu" if HAS_XPU else "cuda"
-device_id = "xpu:0" if HAS_XPU else "cuda:0"
 
 @triton.jit
 def layernorm_forward(
@@ -175,19 +173,16 @@ def test_layernorm(
     bsz = 21, random_state = 3407, seqlen = 3341,
 ):
     from torch.nn import LayerNorm
-
     layernorm = LayerNorm((dim,), eps = eps, device = device_name, dtype = dtype)
     torch.cuda.manual_seed(random_state)
     torch.manual_seed(random_state)
     torch.nn.init.uniform_(layernorm.weight)
     torch.nn.init.uniform_(layernorm.bias)
-
     X = torch.randn((bsz, seqlen, dim), dtype = dtype, device = device_name)
     XX = X.clone()
     X .requires_grad_(True)
     XX.requires_grad_(True)
     Y = layernorm(X)
-
     YY = torch.randn((bsz, seqlen, dim), dtype = dtype, device = device_name, requires_grad = True)
     Y.backward(YY)
     correct_grad = X.grad.clone()

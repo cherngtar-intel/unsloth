@@ -12,14 +12,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from unsloth_config import *
+
 import triton
 import triton.language as tl
 import torch
 from .utils import calculate_settings
 
-# KCT
-HAS_XPU = True
-device_id = "xpu:0" if HAS_XPU else "cuda:0"
 
 @triton.jit
 def _fg_kernel(e, g, h, n_elements, BLOCK_SIZE : tl.constexpr,):
@@ -44,7 +43,6 @@ pass
 def swiglu_fg_kernel(e, g):
     batch, seq_len, hd = e.shape
     n_elements = e.numel()
-
     h = torch.empty((batch, seq_len, hd), dtype = e.dtype, device = device_id)
     grid = lambda meta: (triton.cdiv(n_elements, meta['BLOCK_SIZE']),)
     _fg_kernel[grid](e, g, h, n_elements, BLOCK_SIZE = 1024,)

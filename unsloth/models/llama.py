@@ -11,6 +11,9 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+
+from unsloth_config import *
+
 import torch
 import gc
 import math
@@ -68,16 +71,7 @@ except:
     from huggingface_hub.utils._token import get_token
 pass
 from triton import __version__ as triton_version
-# KCT
-device_name = "xpu" if HAS_XPU else "cuda"
-device_id = "xpu:0" if HAS_XPU else "cuda:0"
 import time
-
-if HAS_XFORMERS:
-    causal_mask_type = xformers.attn_bias.BlockDiagonalCausalMask
-else:
-    causal_mask_type = bool
-
 
 def original_apply_qkv(self, X):
     Q = self.q_proj(X)
@@ -173,7 +167,6 @@ def LlamaAttention_fast_forward_inference(
         self.paged_attention_V = self.paged_attention[:,1]
         self.paged_attention_K[:seq_len] = K1.permute(2, 0, 1, 3)
         self.paged_attention_V[:seq_len] = V1.permute(2, 0, 1, 3)
-
         self.temp_QA = torch.empty((2, bsz, 1, attention_size), dtype = dtype, device = device_id)
         self.temp_KV = torch.empty((2, bsz, 1, n_kv_heads*head_dim), dtype = dtype, device = device_id)
         self.RH_Q = torch.empty((bsz, n_heads, 1, head_dim), dtype = dtype, device = device_id)
@@ -184,7 +177,7 @@ def LlamaAttention_fast_forward_inference(
         else:
             self.temp_O = self.temp_QA[1][:,:,:self.hidden_size]
         pass
-     
+
         self.attention = torch.empty((bsz, n_heads, 1, KV_CACHE_INCREMENT+seq_len), dtype = dtype, device = device_id)
         self.scalar = 1.0 / math_sqrt(self.head_dim)
         self.half_head_dim = head_dim // 2
@@ -220,7 +213,7 @@ def LlamaAttention_fast_forward_inference(
     Qn *= cos
     Qn.addcmul_(RH_Q, sin)
 
-    RH_K = RH_Q[:,:n_kv_heads,:,:] # torch.empty((n_kv_heads, 1, head_dim), dtype = dtype, device = "cuda:0")
+    RH_K = RH_Q[:,:n_kv_heads,:,:] # torch.empty((n_kv_heads, 1, head_dim), dtype = dtype, device = device_id)
     RH_K[:,:,:,:h] = Kn[:,:,:,h:]
     RH_K[:,:,:,h:] = Kn[:,:,:,:h]
     torch.neg(RH_K[:,:,:,:h], out = RH_K[:,:,:,:h])
@@ -282,7 +275,7 @@ def fast_swiglu_inference(self, X):
     # up   = self.up_proj(X)
     bsz, _, hd = X.shape
     # mlp_size = self.config.intermediate_size
-    # temp = torch.empty((2, bsz, 1, mlp_size), dtype = X.dtype, device = "cuda:0")
+    # temp = torch.empty((2, bsz, 1, mlp_size), dtype = X.dtype, device = device_id)
 
     gate = fast_linear_forward(self.gate_proj, X)#, out = temp[0])
     up   = fast_linear_forward(self.  up_proj, X)#, out = temp[1])
@@ -573,6 +566,7 @@ def LlamaModel_fast_forward(
     return_dict:          Optional[bool] = None,
     *args, **kwargs,
 ) -> Union[Tuple, BaseModelOutputWithPast]:
+
     output_attentions = output_attentions if output_attentions is not None else self.config.output_attentions
     assert(output_attentions is False)
     output_hidden_states = (
@@ -620,7 +614,7 @@ def LlamaModel_fast_forward(
         position_ids = torch.arange(
             past_key_values_length, seq_length + past_key_values_length,
             dtype  = torch.int32,
-            device = "cuda:0",
+            device = device_id,
         )
         position_ids = position_ids.unsqueeze(0).view(-1, seq_length)
     elif position_ids is not None:
@@ -978,12 +972,11 @@ def CausalLM_fast_forward(fast_forward_inference):
         *args, **kwargs,
     ) -> Union[Tuple, CausalLMOutputWithPast]:
         
-        # KCT : Benchmark
-        start_time = 0
-        end_time = 0
+        if ENABLE_BENCHMARK:
+            start_time = 0
+            end_time = 0
 
         if past_key_values is not None:
-            #start_time = time.time()
             outputs = fast_forward_inference(
                 self,
                 input_ids,
@@ -994,8 +987,8 @@ def CausalLM_fast_forward(fast_forward_inference):
         else:
             if HAS_XFORMERS:
                 causal_mask = xformers.attn_bias.LowerTriangularMask()
-            # KCT : Benchmark
-            start_time = time.time()
+            if ENABLE_BENCHMARK:
+                start_time = time.time()
             output_attentions = output_attentions if output_attentions is not None else self.config.output_attentions
             output_hidden_states = (
                 output_hidden_states if output_hidden_states is not None else self.config.output_hidden_states
@@ -1055,11 +1048,11 @@ def CausalLM_fast_forward(fast_forward_inference):
             pass
             logits = self.lm_head(hidden_states.to(lm_head.dtype))
         pass
-        # KCT : Benchmark
-        if start_time != 0:
-            end_time = time.time()
-            ttft_time = end_time - start_time
-            print(f"first_token_time: {ttft_time:.4f} seconds")
+        if ENABLE_BENCHMARK:
+            if start_time != 0:
+                end_time = time.time()
+                ttft_time = end_time - start_time
+                print(f"first_token_time (llama): {ttft_time:.4f} seconds")
 
         torch_dtype = __DTYPE_MAP.get(self.config.torch_dtype, None)
         if torch_dtype is not None:
@@ -1226,7 +1219,7 @@ class LlamaRotaryEmbedding(torch.nn.Module):
     def extend_rope_embedding(self, x, seq_len):
         if seq_len <= self.current_rope_size: return
         # Iteratively grow by increments of 8192
-        self.current_rope_size = math.ceil(seq_len / 8192) * 8192
+        self.current_rope_size = ((seq_len // 8192) + ((seq_len % 8192) != 0)) * 8192
         self._set_cos_sin_cache(self.current_rope_size, device = device_id, dtype = x.dtype)
     pass
 pass
@@ -1352,7 +1345,7 @@ class LlamaExtendedRotaryEmbedding(torch.nn.Module):
     def extend_rope_embedding(self, x, seq_len):
         if seq_len <= self.current_rope_size: return
         # Iteratively grow by increments of 8192
-        self.current_rope_size = math.ceil(seq_len / 8192) * 8192
+        self.current_rope_size = ((seq_len // 8192) + ((seq_len % 8192) != 0)) * 8192
         self._set_cos_sin_cache(self.current_rope_size, device = device_id, dtype = x.dtype)
     pass
 pass
@@ -1467,10 +1460,8 @@ class LongRopeRotaryEmbedding(torch.nn.Module):
     def extend_rope_embedding(self, x, seq_len):
         if seq_len <= self.current_rope_size: return
         # Iteratively grow by increments of 8192
-        self.current_rope_size = math.ceil(seq_len / 8192) * 8192
-# KCT : CUDA
-        self._set_cos_sin_cache(self.current_rope_size, device = "xpu:0", dtype = x.dtype)
-#        self._set_cos_sin_cache(self.current_rope_size, device = "cuda:0", dtype = x.dtype)
+        self.current_rope_size = ((seq_len // 8192) + ((seq_len % 8192) != 0)) * 8192
+        self._set_cos_sin_cache(self.current_rope_size, device = device_id, dtype = x.dtype)
     pass
 pass
 
@@ -1612,18 +1603,24 @@ class FastLlamaModel:
         if model_patcher is None: model_patcher = FastLlamaModel
         SUPPORTS_BFLOAT16 = is_bfloat16_supported()
 
-        if HAS_XPU == False and HAS_XFORMERS:
-            gpu_stats = torch.cuda.get_device_properties(0)
-            max_memory = round(gpu_stats.total_memory / 1024 / 1024 / 1024, 3)
+        gpu_stats = torch.xpu.get_device_properties(0) if HAS_XPU else torch.cuda.get_device_properties(0)
+        max_memory = round(gpu_stats.total_memory / 1024 / 1024 / 1024, 3)
+
+        if HAS_XPU:
             statistics = \
-            f"==((====))==  Unsloth {__version__}: Fast {model_patcher.__name__[4:-5]} patching. Transformers = {transformers_version}.\n"\
+            f"==((====))==  Unsloth {__version__}: Fast {model_patcher.__name__[4:-5]} patching. Transformers:{transformers_version}.\n"\
+            f"   \\\   /|    GPU: {gpu_stats.name}. Max memory: {max_memory} GB. Platform: {platform_system}.\n"\
+            f"O^O/ \_/ \\    Torch: {torch.__version__}. Driver: {gpu_stats.driver_version}. XPU Toolkit: {torch.version.xpu}. Triton: {triton_version}\n"\
+            f"\        /    Bfloat16 = {str(SUPPORTS_BFLOAT16).upper()}. FA [Xformers = {HAS_XFORMERS}. FA2 = {HAS_FLASH_ATTENTION}]\n"\
+            f' "-____-"     Free Apache license: http://github.com/unslothai/unsloth'
+        else:
+            statistics = \
+            f"==((====))==  Unsloth {__version__}: Fast {model_patcher.__name__[4:-5]} patching. Transformers:{transformers_version}.\n"\
+            f"   \\\   /|    GPU: {gpu_stats.name}. Max memory: {max_memory} GB. Platform: {platform_system}.\n"\
+            f"O^O/ \_/ \\    Torch: {torch.__version__}. CUDA: {gpu_stats.major}.{gpu_stats.minor}. CUDA Toolkit: {torch.version.cuda}. Triton: {triton_version}\n"\
             f"\        /    Bfloat16 = {str(SUPPORTS_BFLOAT16).upper()}. FA [Xformers = {xformers_version}. FA2 = {HAS_FLASH_ATTENTION}]\n"\
             f' "-____-"     Free Apache license: http://github.com/unslothai/unsloth'
-            f"   \\\   /|    GPU: {gpu_stats.name}. Max memory: {max_memory} GB. Platform = {platform_system}.\n"\
-            f"O^O/ \_/ \\    Pytorch: {torch.__version__}. CUDA = {gpu_stats.major}.{gpu_stats.minor}. CUDA Toolkit = {torch.version.cuda}.\n"\
-            f"\        /    Bfloat16 = {str(SUPPORTS_BFLOAT16).upper()}. FA [Xformers = {xformers_version}. FA2 = {HAS_FLASH_ATTENTION}]\n"\
-            f' "-____-"     Free Apache license: http://github.com/unslothai/unsloth'
-            print(statistics)
+        print(statistics)
 
         # Warn about fast transfers
         old_hf_transfer = os.environ.get("HF_HUB_ENABLE_HF_TRANSFER", "0")
@@ -1691,7 +1688,6 @@ class FastLlamaModel:
         pre_check = check_nvidia()
 
         bnb_config = None
-
         if load_in_4bit:
             bnb_config = BitsAndBytesConfig(
                 load_in_4bit              = True,
@@ -1700,7 +1696,6 @@ class FastLlamaModel:
                 bnb_4bit_compute_dtype    = dtype,
             )
         pass
-
 
         # https://huggingface.co/togethercomputer/LLaMA-2-7B-32K/discussions/12
         # RoPE Scaling's max_position_embeddings must be updated
@@ -1799,7 +1794,8 @@ class FastLlamaModel:
             raise RuntimeError('Unsloth currently does not support multi GPU setups - but we are working on it!')
         for _ in range(3):
             gc.collect()
-            torch.xpu.empty_cache()"""
+            if HAS_XPU: torch.xpu.empty_cache()
+            else: torch.cuda.empty_cache()"""
 
         debug_info = debug_info.split('\n')
         debug_info = "\n".join([debug_info[0]] + [spaces + x[8:] for x in debug_info[1:]])
@@ -2004,7 +2000,6 @@ class FastLlamaModel:
                 if "embed_tokens" in new_target_modules:
                     print("Unsloth: Training embed_tokens in mixed precision to save VRAM")
 
- # KCT : CUDA
                     dtype = model.model.model.embed_tokens.modules_to_save.default.weight.dtype
                     model.model.model.embed_tokens.modules_to_save.default\
                         .to(device = device_id, dtype = torch.float32, non_blocking = True)
@@ -2020,7 +2015,6 @@ class FastLlamaModel:
                     print("Unsloth: Training lm_head in mixed precision to save VRAM")
 
                     dtype = model.model.model.lm_head.modules_to_save.default.weight.dtype
-# KCT : CUDA
                     model.model.lm_head.modules_to_save.default\
                         .to(device = device_id, dtype = torch.float32, non_blocking = True)
                     model.model.lm_head.modules_to_save.default.requires_grad_(True)
@@ -2234,7 +2228,8 @@ class FastLlamaModel:
             # Remove old items to save VRAM
             for _ in range(3):
                 gc.collect()
-                torch.xpu.empty_cache()
+                if HAS_XPU: torch.xpu.empty_cache()
+                else: torch.cuda.empty_cache()
             pass
 
             if train_lm_head:
@@ -2245,7 +2240,8 @@ class FastLlamaModel:
             # Remove old items to save VRAM
             for _ in range(3):
                 gc.collect()
-                torch.xpu.empty_cache()
+                if HAS_XPU: torch.xpu.empty_cache()
+                else: torch.cuda.empty_cache()
             pass
         pass
 
@@ -2259,7 +2255,6 @@ class FastLlamaModel:
         if train_embed_tokens:
             print("Unsloth: Training embed_tokens in mixed precision to save VRAM")
             assert(hasattr(model.model.model.embed_tokens, "modules_to_save"))
-# KCT : CUDA
 
             dtype = model.model.model.embed_tokens.modules_to_save.default.weight.dtype
             model.model.model.embed_tokens.modules_to_save.default\
@@ -2292,7 +2287,8 @@ class FastLlamaModel:
         # Clear deleted GPU items
         for _ in range(3):
             gc.collect()
-            torch.xpu.empty_cache()
+            if HAS_XPU: torch.xpu.empty_cache()
+            else: torch.cuda.empty_cache()
         pass
 
         return model
@@ -2304,7 +2300,6 @@ class FastLlamaModel:
         model,
         use_gradient_checkpointing = True,
     ):
-
         if not isinstance(model, PeftModelForCausalLM):
             raise TypeError(
                 "Unsloth: Your model needs to call `.get_peft_model` first!"
@@ -2492,7 +2487,8 @@ class FastLlamaModel:
         # Clear deleted GPU items
         for _ in range(3):
             gc.collect()
-            torch.xpu.empty_cache()
+            if HAS_XPU: torch.xpu.empty_cache()
+            else: torch.cuda.empty_cache()
         pass
         return model
     pass
@@ -2500,10 +2496,10 @@ class FastLlamaModel:
 
     @staticmethod
     def for_inference(model):
-        if model.config.model_type == "qwen2":
-            FastLlamaModel.for_training(model)
-            return
-        pass
+        # if model.config.model_type == "qwen2":
+        #     FastLlamaModel.for_training(model)
+        #     return
+        # pass
 
         internal_model = model
         internal_model.gradient_checkpointing = False

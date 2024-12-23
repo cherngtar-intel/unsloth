@@ -12,11 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# KCT
-HAS_XPU = True
-HAS_BNB = False
-HAS_XFORMERS = False
-device_name = "xpu:0" if HAS_XPU else "cuda:0"
+from unsloth_config import *
 
 import triton
 MAX_FUSED_SIZE : int = 65536
@@ -29,12 +25,8 @@ if Version(torch.__version__) < Version("2.4.0"):
     torch_amp_custom_fwd = torch.cuda.amp.custom_fwd
     torch_amp_custom_bwd = torch.cuda.amp.custom_bwd
 else:
-    if HAS_XPU:
-        torch_amp_custom_fwd = torch.amp.custom_fwd(device_type = "xpu")
-        torch_amp_custom_bwd = torch.amp.custom_bwd(device_type = "xpu")
-    else:
-        torch_amp_custom_fwd = torch.amp.custom_fwd(device_type = "cuda")
-        torch_amp_custom_bwd = torch.amp.custom_bwd(device_type = "cuda")
+    torch_amp_custom_fwd = torch.amp.custom_fwd(device_type = device_name)
+    torch_amp_custom_bwd = torch.amp.custom_bwd(device_type = device_name)
 pass
 
 
@@ -152,7 +144,6 @@ if HAS_CUDA_STREAM:
             absmax2, code2, blocksize2, _, _, _, _ = state2
         pass
         global CUDA_STREAM
-
         if CUDA_STREAM is None: CUDA_STREAM = torch.cuda.current_stream("cuda:0")
 
         # Create weight matrix
@@ -164,7 +155,6 @@ if HAS_CUDA_STREAM:
 
         # NF4 dequantization of statistics
         n_elements_absmax = absmax.numel()
-
         out_absmax = torch.empty(n_elements_absmax, dtype = torch.float32, device = "cuda:0")
 
         # Do dequantization
@@ -265,7 +255,6 @@ if HAS_CUDA_STREAM:
             absmax2, code2, blocksize2, _, _, _, _ = state2
         pass
         global CUDA_STREAM
-
         if CUDA_STREAM is None: CUDA_STREAM = torch.cuda.current_stream("cuda:0")
         
         # assert(dtype == X.dtype)

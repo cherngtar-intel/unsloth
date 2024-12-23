@@ -12,14 +12,15 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from unsloth_config import *
+
 __version__ = "2024.12.4"
 
 __all__ = [
     "prepare_model_for_kbit_training",
-# KCT : xformers
-#    "xformers",
-#    "xformers_attention",
-#    "xformers_version",
+    "xformers",
+    "xformers_attention",
+    "xformers_version",
     "__version__",
     "HAS_FLASH_ATTENTION",
     "HAS_FLASH_ATTENTION_SOFTCAPPING",
@@ -53,10 +54,6 @@ __all__ = [
     "unpatch_unsloth_gradient_checkpointing",
     "patch_gradient_checkpointing",
     "unpatch_gradient_checkpointing",
- # KCT
-    "HAS_XPU",
-    "HAS_BNB",
-    "HAS_XFORMERS",
 
     "HAS_CUT_CROSS_ENTROPY",
     "EMPTY_LOGITS",
@@ -66,13 +63,11 @@ __all__ = [
     "create_gradient_checkpointing_buffer",
 
     "patch_compiled_autograd",
-    # "process_vision_info",
+    "process_vision_info",
     "unsloth_compile_transformers",
     "patch_fast_lora",
 ]
 
-import sys
-import os
 import torch
 from typing import Union, Optional, List, Any, Callable, Tuple
 from platform import system as platform_system
@@ -80,7 +75,6 @@ platform_system = platform_system()
 import numpy as np
 import warnings, subprocess, re, inspect, psutil, os, math
 from packaging.version import Version
-sys.path.append(os.path.expanduser('~/unsloth/unsloth-zoo'))
 
 from unsloth_zoo.tokenizer_utils import (
     patch_tokenizer as _patch_tokenizer,
@@ -111,9 +105,9 @@ from unsloth_zoo.loss_utils import (
     HAS_CUT_CROSS_ENTROPY,
     fused_linear_cross_entropy,
 )
-# from unsloth_zoo.vision_utils import (
-#     process_vision_info,
-# )
+from unsloth_zoo.vision_utils import (
+    process_vision_info,
+)
 from unsloth_zoo.compiler import (
     get_transformers_model_type,
     unsloth_compile_transformers as _unsloth_compile_transformers,
@@ -174,11 +168,6 @@ except:
 
 # =============================================
 
-# KCT
-HAS_XPU = True
-HAS_BNB = False
-HAS_XFORMERS = False
-
 # =============================================
 # Edits all Config files to enable RoPE Scaling for all models
 
@@ -201,8 +190,7 @@ pass
 
 from transformers import __version__ as transformers_version
 from transformers import PretrainedConfig
-# KCT : Temp focus llama
-model_architectures = ["llama", "mistral",  "gemma", "gemma2", "qwen2"]
+model_architectures = ["llama", "mistral", "gemma", "gemma2", "qwen2", "granite"]
 
 for model_name in model_architectures:
     config_filepath = f"transformers.models.{model_name}.configuration_{model_name}"
@@ -242,12 +230,8 @@ if Version(torch_version) < Version("2.4.0"):
     torch_amp_custom_fwd = torch.cuda.amp.custom_fwd
     torch_amp_custom_bwd = torch.cuda.amp.custom_bwd
 else:
-    if HAS_XPU:
-        torch_amp_custom_fwd = torch.amp.custom_fwd(device_type = "xpu")
-        torch_amp_custom_bwd = torch.amp.custom_bwd(device_type = "xpu")
-    else:
-        torch_amp_custom_fwd = torch.amp.custom_fwd(device_type = "cuda")
-        torch_amp_custom_bwd = torch.amp.custom_bwd(device_type = "cuda")
+    torch_amp_custom_fwd = torch.amp.custom_fwd(device_type = device_id)
+    torch_amp_custom_bwd = torch.amp.custom_bwd(device_type = device_id)
 pass
 # =============================================
 
@@ -348,23 +332,23 @@ from transformers.models.llama.modeling_llama import logger
 
 # =============================================
 # Get Xformers
-# KCT : xformers
-""" from xformers import __version__ as xformers_version
-# Temporarily disable 0.0.27 and higher - inference issues
-if False: #Version(xformers_version) >= Version("0.0.27"):
-    raise ImportError(
-        "Unsloth: If you are in Colab, we updated the top cell install instructions - please change it to below "\
-        "then press Disconnect Runtime and then Restart it.\n"\
-        "\n"\
-        "%%capture\n"
-        "# Installs Unsloth, Xformers (Flash Attention) and all other packages!\n"
-        '!pip install "unsloth[colab-new] @ git+https://github.com/unslothai/unsloth.git"\n'
-        '!pip install --no-deps "xformers<=0.0.27" trl peft accelerate bitsandbytes\n'\
-        '\n'\
-        f"Otherwise in local machines, your xformers version of {xformers_version} is too new.\n"\
-        'Please downgrade xformers via `pip install --force-reinstall "xformers<=0.0.27"'
-    )
-pass
+try:
+    from xformers import __version__ as xformers_version
+    # Temporarily disable 0.0.27 and higher - inference issues
+    if False: #Version(xformers_version) >= Version("0.0.27"):
+        raise ImportError(
+            "Unsloth: If you are in Colab, we updated the top cell install instructions - please change it to below "\
+            "then press Disconnect Runtime and then Restart it.\n"\
+            "\n"\
+            "%%capture\n"
+            "# Installs Unsloth, Xformers (Flash Attention) and all other packages!\n"
+            '!pip install "unsloth[colab-new] @ git+https://github.com/unslothai/unsloth.git"\n'
+            '!pip install --no-deps "xformers<=0.0.27" trl peft accelerate bitsandbytes\n'\
+            '\n'\
+            f"Otherwise in local machines, your xformers version of {xformers_version} is too new.\n"\
+            'Please downgrade xformers via `pip install --force-reinstall "xformers<=0.0.27"'
+        )
+    pass
 
     if   Version(torch_version) < Version("2.2.0") and Version(xformers_version) >= Version("0.0.24"):
         raise ImportError(
@@ -383,21 +367,25 @@ pass
         )
     pass
 
-from xformers._cpp_lib import _register_extensions
-try:
-    _register_extensions() # Check if C++ modules are loaded correctly
-except Exception as error:
-    raise ImportError(
-        "Unsloth: Xformers was not installed correctly.\n"\
-        "Please install xformers separately first.\n"\
-        "Then confirm if it's correctly installed by running:\n"\
-        "python -m xformers.info\n\n"
-        "Longer error message:\n" + str(error)
-    )
+    from xformers._cpp_lib import _register_extensions
+    try:
+        _register_extensions() # Check if C++ modules are loaded correctly
+    except Exception as error:
+        raise ImportError(
+            "Unsloth: Xformers was not installed correctly.\n"\
+            "Please install xformers separately first.\n"\
+            "Then confirm if it's correctly installed by running:\n"\
+            "python -m xformers.info\n\n"
+            "Longer error message:\n" + str(error)
+        )
+    pass
+    import xformers.ops.fmha as xformers
+    xformers_attention = xformers.memory_efficient_attention
+except:
+    xformers = None
+    xformers_attention = None
+    xformers_version = "0.0.00"
 pass
-import xformers.ops.fmha as xformers
-xformers_attention = xformers.memory_efficient_attention """
-
 
 # Check TRL version
 from trl import __version__ as trl_version
@@ -422,8 +410,7 @@ pass
 accelerate_old_send_to_device = None
 accelerate_new_send_to_device = None
 
-#KCT : xformers
-""" if Version(xformers_version) >= Version("0.0.27"):
+if Version(xformers_version) >= Version("0.0.27"):
     import accelerate.utils.operations
     if hasattr(accelerate.utils.operations, "send_to_device") and \
         accelerate.utils.operations.send_to_device.__name__ != "_fixed_send_to_device":
@@ -439,7 +426,7 @@ accelerate_new_send_to_device = None
         # accelerate.utils.operations.send_to_device = _fixed_send_to_device
         accelerate_new_send_to_device = _fixed_send_to_device
     pass
-pass """
+pass
 
 # Transformers 4.46 breaks dynamic caching. This is a hack
 import transformers.generation.configuration_utils
@@ -471,37 +458,6 @@ patch_torch_compile(
     O3 = UNSLOTH_COMPILE_MAXIMUM,
     ignore_errors = UNSLOTH_COMPILE_IGNORE_ERRORS,
 )
-# Torch compile arguments
-torch_compile_arguments = [
-    "config.dce = True",
-    "config.memory_planning = True",
-    "config.memory_pool = 'combined'",
-    "config.coordinate_descent_tuning = True",
-    "config.max_autotune_gemm = False", # GEMM is unnecessary
-    "config.autotune_multi_device = False",
-    "config.max_autotune_gemm_backends = 'TRITON,ATEN,CPP'", # Not much faster
-    "config.aggressive_fusion = False", # Careful changes results!
-    "config.cuda.enable_cuda_lto = True",
-    "config.cuda.use_fast_math = True",
-    "config.cuda.compile_opt_level = '-O2'",
-]
-# Torch dynamo arguments
-torch_dynamo_arguments = [
-    "config.accumulated_cache_size_limit = 1024", # Bump up a bit from 256
-    "config.suppress_errors = True", # Supress errors for now
-    "config.do_not_emit_runtime_asserts = True",
-    "config.cache_size_limit = 1024", # Flex Attention
-]
-import torch._inductor.config as config
-for _try_compile_argument in torch_compile_arguments:
-    try:    exec(_try_compile_argument)
-    except: pass
-pass
-import torch._dynamo.config as config
-for _try_dynamo_argument in torch_dynamo_arguments:
-    try:    exec(_try_dynamo_argument)
-    except: pass
-pass
 
 torch_compile_options = {
     "epilogue_fusion"   : True,

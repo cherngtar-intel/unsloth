@@ -12,14 +12,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from unsloth_config import *
+
 import triton
 import triton.language as tl
 import torch
 from .utils import calculate_settings, triton_tanh
 
-# KCT
-HAS_XPU = True
-device_id = "xpu:0" if HAS_XPU else "cuda:0"
 
 @triton.jit
 def _exact_forward_kernel(e, g, h, n_elements, BLOCK_SIZE : tl.constexpr,):
@@ -44,7 +43,6 @@ pass
 def geglu_exact_forward_kernel(gate, up):
     batch, seq_len, hd = gate.shape
     n_elements = gate.numel()
-
     out = torch.empty((batch, seq_len, hd), dtype = gate.dtype, device = device_id)
     grid = lambda meta: (triton.cdiv(n_elements, meta['BLOCK_SIZE']),)
     _exact_forward_kernel[grid](gate, up, out, n_elements, BLOCK_SIZE = 1024,)
@@ -137,9 +135,7 @@ pass
 def geglu_approx_forward_kernel(gate, up):
     batch, seq_len, hd = gate.shape
     n_elements = gate.numel()
-
     out = torch.empty((batch, seq_len, hd), dtype = gate.dtype, device = device_id)
-    # out = torch.empty((batch, seq_len, hd), dtype = gate.dtype, device = "cuda:0")
     grid = lambda meta: (triton.cdiv(n_elements, meta['BLOCK_SIZE']),)
     _approx_forward_kernel[grid](gate, up, out, n_elements, BLOCK_SIZE = 1024,)
     return out

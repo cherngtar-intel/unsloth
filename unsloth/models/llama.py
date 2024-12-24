@@ -177,7 +177,7 @@ def LlamaAttention_fast_forward_inference(
         else:
             self.temp_O = self.temp_QA[1][:,:,:self.hidden_size]
         pass
-
+        
         self.attention = torch.empty((bsz, n_heads, 1, KV_CACHE_INCREMENT+seq_len), dtype = dtype, device = device_id)
         self.scalar = 1.0 / math_sqrt(self.head_dim)
         self.half_head_dim = head_dim // 2
@@ -566,7 +566,7 @@ def LlamaModel_fast_forward(
     return_dict:          Optional[bool] = None,
     *args, **kwargs,
 ) -> Union[Tuple, BaseModelOutputWithPast]:
-
+    
     output_attentions = output_attentions if output_attentions is not None else self.config.output_attentions
     assert(output_attentions is False)
     output_hidden_states = (
@@ -987,8 +987,10 @@ def CausalLM_fast_forward(fast_forward_inference):
         else:
             if HAS_XFORMERS:
                 causal_mask = xformers.attn_bias.LowerTriangularMask()
+
             if ENABLE_BENCHMARK:
                 start_time = time.time()
+
             output_attentions = output_attentions if output_attentions is not None else self.config.output_attentions
             output_hidden_states = (
                 output_hidden_states if output_hidden_states is not None else self.config.output_hidden_states
@@ -1048,11 +1050,12 @@ def CausalLM_fast_forward(fast_forward_inference):
             pass
             logits = self.lm_head(hidden_states.to(lm_head.dtype))
         pass
+
         if ENABLE_BENCHMARK:
             if start_time != 0:
                 end_time = time.time()
                 ttft_time = end_time - start_time
-                print(f"first_token_time (llama): {ttft_time:.4f} seconds")
+                print(f"\n ### First Token Delay Time (llama): {ttft_time:.4f} seconds \n")
 
         torch_dtype = __DTYPE_MAP.get(self.config.torch_dtype, None)
         if torch_dtype is not None:
@@ -1704,7 +1707,7 @@ class FastLlamaModel:
 
         # Cannot be None, since HF now checks for the config
         if load_in_4bit: kwargs["quantization_config"] = bnb_config
-
+        
         model = AutoModelForCausalLM.from_pretrained(
             model_name,
             device_map              = device_map,

@@ -5,8 +5,9 @@ Setup [Prerequisites](https://github.com/intel/intel-xpu-backend-for-triton?tab=
 
 Clone this repository:
 ```
-git clone https://github.com/cherngtar-intel/unsloth.git -b unsloth_xpu_20241001
+git clone https://github.com/cherngtar-intel/unsloth.git -b unsloth_xpu_20241210
 cd unsloth
+git submodule update --init --recursive
 ```
 To avoid potential conflicts with installed packages it is recommended to create and activate a new Python virtual environment:
 ```
@@ -23,8 +24,8 @@ pip install -r requirements.txt
 ```
 Initialize the toolchain
 ```
-# replace /opt/intel/oneapi with the actual location of Intel® Deep Learning Essentials
-source /opt/intel/oneapi/setvars.sh
+# replace /opt/intel/oneapi/2025.0/ with the actual location of Intel® Deep Learning Essentials
+source /opt/intel/oneapi/2025.0/oneapi-vars.sh
 ```
 
 #### To run Unsloth inference with xpu
@@ -42,4 +43,4 @@ To launch unsloth server:
 ```
 python unsloth_server.py
 ```
-Further steps from client side, refer to [fork repository Intel AI Assistant Client Application](https://github.com/kuanxian1/applications.ai.superbuilder/tree/kuanxian1/upmerge-v0.7.0.1102)
+Further steps from client side, refer to [fork repository Intel AI Assistant Client Application](https://github.com/kuanxian1/applications.ai.superbuilder/tree/upmerge-v0.7.0.1125)

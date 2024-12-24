@@ -275,7 +275,7 @@ def MistralForCausalLM_fast_forward(
         if start_time != 0:
             end_time = time.time()
             ttft_time = end_time - start_time
-            print(f"first_token_time (mistral): {ttft_time:.4f} seconds")
+            print(f"\n ### First Token Delay Time (mistral): {ttft_time:.4f} seconds \n")
 
     loss = None
     if labels is not None:

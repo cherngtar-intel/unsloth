@@ -13,6 +13,7 @@
 # limitations under the License.
 
 from unsloth_config import *
+import unsloth_shared as shared
 
 from .llama import *
 import os
@@ -275,7 +276,9 @@ def MistralForCausalLM_fast_forward(
         if start_time != 0:
             end_time = time.time()
             ttft_time = end_time - start_time
-            print(f"\n ### First Token Delay Time (mistral): {ttft_time:.4f} seconds \n")
+            print(f"First Token Delay Time (mistral): {ttft_time:.6f} seconds")
+            if shared.first_token_delay_time == 0:
+                shared.first_token_delay_time = ttft_time
 
     loss = None
     if labels is not None:

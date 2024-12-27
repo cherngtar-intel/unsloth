@@ -1,0 +1,1 @@
+first_token_delay_time = 0

@@ -24,7 +24,7 @@ script_name = "unsloth_inference.py"
 param_list_benchmark_1 = [
     {"model": "meta-llama/Llama-3.2-1B-Instruct", "warm_up": None, "output_csv": None, "outfile": "benchmark_1.csv"},
     {"model": "meta-llama/Llama-3.2-3B-Instruct", "warm_up": None, "output_csv": None, "outfile": "benchmark_1.csv"},
-    {"model": "meta-llama/Meta-Llama-3.1-8B-Instruct", "warm_up": None, "output_csv": None, "outfile": "benchmark_1.csv"},
+    # {"model": "meta-llama/Meta-Llama-3.1-8B-Instruct", "warm_up": None, "output_csv": None, "outfile": "benchmark_1.csv"},
     {"model": "microsoft/Phi-3-mini-4k-instruct", "warm_up": None, "output_csv": None, "outfile": "benchmark_1.csv"},
     {"model": "google/gemma-2b-it", "warm_up": None, "output_csv": None, "outfile": "benchmark_1.csv"},
     {"model": "HuggingFaceH4/zephyr-7b-beta", "warm_up": None, "output_csv": None, "outfile": "benchmark_1.csv"},
@@ -35,7 +35,7 @@ param_list_benchmark_1 = [
 param_list_benchmark_2 = [
     {"model": "meta-llama/Llama-3.2-1B-Instruct", "text_streamer": "custom", "output_csv": None, "outfile": "benchmark_2.csv"},
     {"model": "meta-llama/Llama-3.2-3B-Instruct", "text_streamer": "custom", "output_csv": None, "outfile": "benchmark_2.csv"},
-    {"model": "meta-llama/Meta-Llama-3.1-8B-Instruct", "text_streamer": "custom", "output_csv": None, "outfile": "benchmark_2.csv"},
+    # {"model": "meta-llama/Meta-Llama-3.1-8B-Instruct", "text_streamer": "custom", "output_csv": None, "outfile": "benchmark_2.csv"},
     {"model": "microsoft/Phi-3-mini-4k-instruct", "text_streamer": "custom", "output_csv": None, "outfile": "benchmark_2.csv"},
     {"model": "google/gemma-2b-it", "text_streamer": "custom", "output_csv": None, "outfile": "benchmark_2.csv"},
     {"model": "HuggingFaceH4/zephyr-7b-beta", "text_streamer": "custom", "output_csv": None, "outfile": "benchmark_2.csv"},

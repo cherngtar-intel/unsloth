@@ -219,6 +219,7 @@ first_token_latency_ms = shared.first_token_delay_time * 1000
 loading_time = load_end_time - load_start_time
 generation_time = generation_end_time - generation_start_time
 throughput = num_generated_tokens / generation_time
+max_memory = torch.xpu.max_memory_allocated()
 
 print(f"### Input Tokens Count: {num_input_tokens}")
 print(f"### Output Tokens Count: {num_output_tokens}")
@@ -227,6 +228,7 @@ print(f"### Loading Time: {loading_time:.6f} secs")
 print(f"### Inference Time: {generation_time:.6f} secs")
 print(f"### 1st Token Latency: {first_token_latency_ms:.6f} msec")
 print(f"### Throughput: {throughput:.6f} tokens/sec")
+print(f"### Max memory allocated: {max_memory / (1024 ** 3):02} GB")
 
 if USE_TEXT_STREAMER == "custom":
     throughput_2p = (num_generated_tokens - 1) / (generation_end_time - first_valid_token_time)
